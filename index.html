@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Game - Hotbar System</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <style>
+        /* Estilos dos Joysticks (Mantidos) */
+        .joystick-container {
+            position: fixed;
+            bottom: 20px;
+            z-index: 999;
+            display: grid;
+            grid-template-columns: repeat(3, 50px);
+            grid-template-rows: repeat(2, 50px);
+            gap: 5px;
+            user-select: none;
+        }
+        .left-panel { left: 20px; }
+        .right-panel { right: 20px; }
+        
+        button {
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid white;
+            color: white;
+            border-radius: 10px;
+            touch-action: none;
+        }
+
+        /* --- ESTILO DA HOTBAR --- */
+        .hotbar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 5px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+        .slot {
+            width: 45px;
+            height: 45px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #555;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .slot.active {
+            border-color: #ffff00; /* Borda amarela para o selecionado */
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .label {
+            position: fixed;
+            bottom: 135px;
+            color: white;
+            font-family: sans-serif;
+            font-size: 10px;
+            background: rgba(0,0,0,0.5);
+            padding: 2px 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <a-scene>
+        <a-plane position="0 0 0" rotation="-90 0 0" width="1000" height="1000" color="#1a1a1a"></a-plane>
+        <a-sky color="#000"></a-sky>
+
+        <a-entity id="rig" position="0 1.6 0">
+            <a-entity id="camera" camera look-controls="enabled: true"></a-entity>
+        </a-entity>
+    </a-scene>
+
+    <div class="hotbar" id="hotbar">
+        <div class="slot active" onclick="selectSlot(0)">1</div>
+        <div class="slot" onclick="selectSlot(1)">2</div>
+        <div class="slot" onclick="selectSlot(2)">3</div>
+        <div class="slot" onclick="selectSlot(3)">4</div>
+        <div class="slot" onclick="selectSlot(4)">5</div>
+    </div>
+
+    <div class="joystick-container left-panel">
+        <div style="grid-column: 2"><button id="btnUp">W</button></div>
+        <button id="btnLeft" style="grid-row: 2; grid-column: 1">A</button>
+        <button id="btnDown" style="grid-row: 2; grid-column: 2">S</button>
+        <button id="btnRight" style="grid-row: 2; grid-column: 3">D</button>
+    </div>
+
+    <div class="joystick-container right-panel">
+        <div style="grid-column: 2"><button id="lookUp">↑</button></div>
+        <button id="lookLeft" style="grid-row: 2; grid-column: 1">←</button>
+        <button id="lookDown" style="grid-row: 2; grid-column: 2">↓</button>
+        <button id="lookRight" style="grid-row: 2; grid-column: 3">→</button>
+    </div>
+
+    <script>
+        // --- LÓGICA DA HOTBAR ---
+        let currentSlot = 0;
+        const slots = document.querySelectorAll('.slot');
+
+        function selectSlot(index) {
+            slots[currentSlot].classList.remove('active');
+            currentSlot = index;
+            slots[currentSlot].classList.add('active');
+            console.log("Item selecionado: " + (currentSlot + 1));
+        }
+
+        // --- LÓGICA DE MOVIMENTO (Otimizada) ---
+        const rig = document.querySelector('#rig');
+        const camera = document.querySelector('#camera');
+        let moveSpeed = 0.1;
+        let rotationSpeed = 1.5;
+
+        const keys = { 
+            up: false, down: false, left: false, right: false,
+            lookUp: false, lookDown: false, lookLeft: false, lookRight: false
+        };
+
+        function bindButton(id, key) {
+            const btn = document.getElementById(id);
+            const start = (e) => { e.preventDefault(); keys[key] = true; };
+            const end = () => keys[key] = false;
+            btn.addEventListener('mousedown', start);
+            btn.addEventListener('mouseup', end);
+            btn.addEventListener('touchstart', start);
+            btn.addEventListener('touchend', end);
+        }
+
+        ['Up', 'Down', 'Left', 'Right'].forEach(d => bindButton('btn'+d, d.toLowerCase()));
+        ['Up', 'Down', 'Left', 'Right'].forEach(d => bindButton('look'+d, 'look'+d));
+
+        function update() {
+            let rotation = camera.getAttribute('rotation');
+            let angle = rotation.y * (Math.PI / 180);
+            let pos = rig.getAttribute('position');
+
+            if (keys.up) { pos.x -= Math.sin(angle) * moveSpeed; pos.z -= Math.cos(angle) * moveSpeed; }
+            if (keys.down) { pos.x += Math.sin(angle) * moveSpeed; pos.z += Math.cos(angle) * moveSpeed; }
+            if (keys.left) { pos.x -= Math.cos(angle) * moveSpeed; pos.z += Math.sin(angle) * moveSpeed; }
+            if (keys.right) { pos.x += Math.cos(angle) * moveSpeed; pos.z -= Math.sin(angle) * moveSpeed; }
+
+            let camRot = camera.getAttribute('rotation');
+            if (keys.lookLeft) camRot.y += rotationSpeed;
+            if (keys.lookRight) camRot.y -= rotationSpeed;
+            if (keys.lookUp) camRot.x += rotationSpeed;
+            if (keys.lookDown) camRot.x -= rotationSpeed;
+
+            rig.setAttribute('position', pos);
+            camera.setAttribute('rotation', camRot);
+            requestAnimationFrame(update);
+        }
+        update();
+    </script>
+</body>
+</html>
