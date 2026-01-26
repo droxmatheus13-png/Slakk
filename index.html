@@ -7,38 +7,36 @@
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; }
         
-        /* Tela Inicial */
-        #menu-inicial {
+        /* Telas de UI */
+        #menu-inicial, #intro-text, #tela-acordar {
             position: absolute; width: 100%; height: 100%;
-            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             z-index: 100; transition: opacity 1s;
         }
 
-        h1 { color: #8b0000; font-size: 3.5rem; text-shadow: 0 0 15px #f00; margin-bottom: 20px; text-align: center; }
+        #menu-inicial { background: radial-gradient(circle, #1a1a1a 0%, #000 100%); }
+        h1 { color: #8b0000; font-size: 3.5rem; text-shadow: 0 0 15px #f00; text-align: center; }
 
         button {
             padding: 15px 40px; font-size: 1.2rem; background: transparent;
             color: white; border: 2px solid #444; cursor: pointer;
-            transition: 0.3s; letter-spacing: 3px;
+            transition: 0.3s; letter-spacing: 3px; margin: 10px;
         }
+        button:hover { background: #8b0000; box-shadow: 0 0 20px #f00; }
 
-        button:hover { background: #8b0000; border-color: #f00; box-shadow: 0 0 20px #f00; }
+        /* Sistema de Acordar */
+        #tela-acordar { display: none; background: black; z-index: 300; }
+        .btn-acordar { position: absolute; border-color: #333; font-size: 0.8rem; opacity: 0.6; }
 
-        /* Animação de Texto */
-        #intro-text {
-            position: absolute; width: 100%; height: 100%;
-            display: none; align-items: center; justify-content: center;
-            background: black; z-index: 90; color: white; font-size: 2.5rem;
-        }
-
-        /* Tela de Fade Preto */
         #fade-overlay {
             position: absolute; width: 100%; height: 100%;
             background: black; opacity: 0; pointer-events: none; z-index: 200;
         }
 
-        canvas { display: block; }
+        #instrucoes {
+            position: absolute; bottom: 20px; width: 100%; text-align: center;
+            color: white; font-size: 0.9rem; pointer-events: none; display: none;
+        }
     </style>
 </head>
 <body>
@@ -50,7 +48,13 @@
         <button onclick="iniciarJogo()">COMEÇAR JOGO</button>
     </div>
 
-    <div id="intro-text"></div>
+    <div id="intro-text" style="display:none; color:white; font-size:2.5rem; background:black;"></div>
+
+    <div id="tela-acordar">
+        <h2 style="color: #444;">...você está sonhando...</h2>
+        </div>
+
+    <div id="instrucoes">USE O MOUSE PARA OLHAR | WASD PARA ANDAR (Em breve)</div>
 
 <script type="importmap">
     {
@@ -64,75 +68,58 @@
 
 <script type="module">
     import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
     import TWEEN from 'tween';
 
-    let cenaAtiva = false;
-
-    // --- CONFIGURAÇÃO THREE.JS ---
+    // --- SETUP BÁSICO ---
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x020205, 0.003);
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Posição inicial da câmera (longe para o vôo)
-    camera.position.set(0, 500, 1000);
+    const controls = new PointerLockControls(camera, document.body);
+    let botoesClicados = 0;
 
-    // --- AMBIENTE ---
-    const ambient = new THREE.AmbientLight(0x222233, 0.5);
-    scene.add(ambient);
-
-    // Estrelas
-    const starGeo = new THREE.BufferGeometry();
-    const starPos = [];
-    for(let i=0; i<8000; i++) starPos.push((Math.random()-0.5)*2000, Math.random()*1000, (Math.random()-0.5)*2000);
-    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
-    scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({color: 0xffffff, size: 0.8})));
-
-    // Chão
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.MeshStandardMaterial({color: 0x050505}));
-    ground.rotation.x = -Math.PI/2;
-    scene.add(ground);
-
-    // --- CIDADE ---
+    // --- ELEMENTOS DA CIDADE (LONGE) ---
+    const cityGroup = new THREE.Group();
+    scene.add(cityGroup);
     function createCity() {
-        for (let i = 0; i < 250; i++) {
-            const x = (Math.random() - 0.5) * 800;
-            const z = (Math.random() - 0.5) * 800;
-            let h = 20 + Math.random() * 100;
-            let w = 15 + Math.random() * 10;
-            
-            const bGeo = new THREE.BoxGeometry(w, h, w);
-            const bMat = new THREE.MeshStandardMaterial({color: 0x1a1a2e});
-            const b = new THREE.Mesh(bGeo, bMat);
-            b.position.set(x, h/2, z);
-            scene.add(b);
-
-            // Janelas acesas
-            const winGeo = new THREE.BoxGeometry(w + 0.1, 0.5, w + 0.1);
-            const winMat = new THREE.MeshBasicMaterial({color: 0xffcc00});
-            for(let y = 5; y < h; y += 8) {
-                if(Math.random() > 0.4) {
-                    const wM = new THREE.Mesh(winGeo, winMat);
-                    wM.position.set(x, y, z);
-                    scene.add(wM);
-                }
-            }
+        for (let i = 0; i < 100; i++) {
+            const h = 20 + Math.random() * 80;
+            const b = new THREE.Mesh(new THREE.BoxGeometry(10, h, 10), new THREE.MeshStandardMaterial({color: 0x111122}));
+            b.position.set(Math.random()*400-200, h/2, -600 + Math.random()*200);
+            cityGroup.add(b);
         }
     }
     createCity();
 
-    // Pizzaria (O Ponto Final do Vôo)
-    const pizzaria = new THREE.Mesh(new THREE.BoxGeometry(30, 15, 30), new THREE.MeshStandardMaterial({color: 0x441111}));
-    pizzaria.position.set(0, 7.5, 0);
-    scene.add(pizzaria);
-    const pizzLight = new THREE.PointLight(0xff0000, 500, 100);
-    pizzLight.position.set(0, 20, 0);
-    scene.add(pizzLight);
+    // --- A CASA ISOLADA ---
+    const houseGroup = new THREE.Group();
+    scene.add(houseGroup);
 
-    // --- LÓGICA DE INTRODUÇÃO ---
+    // Chão da floresta/campo
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({color: 0x051105}));
+    floor.rotation.x = -Math.PI/2;
+    scene.add(floor);
+
+    // Paredes da Casa (Interior)
+    const wallMat = new THREE.MeshStandardMaterial({color: 0x221105});
+    const room = new THREE.Mesh(new THREE.BoxGeometry(20, 15, 20), wallMat);
+    room.position.set(0, 7.5, 0);
+    room.material.side = THREE.BackSide; // Ver por dentro
+    houseGroup.add(room);
+
+    // Luz fraca dentro da casa
+    const lamp = new THREE.PointLight(0xffaa00, 0, 15);
+    lamp.position.set(0, 12, 0);
+    scene.add(lamp);
+
+    scene.add(new THREE.AmbientLight(0x111122, 0.2));
+
+    camera.position.set(0, 300, 500); // Câmera começa no alto para a animação
+
+    // --- LÓGICA DO JOGO ---
     window.iniciarJogo = function() {
         document.getElementById('menu-inicial').style.opacity = '0';
         setTimeout(() => {
@@ -146,59 +133,76 @@
         intro.style.display = 'flex';
         const texto = "FNAF: NO SAFE PLACE";
         let i = 0;
-        
         const interval = setInterval(() => {
-            intro.innerText += texto[i];
-            i++;
+            intro.innerText += texto[i]; i++;
             if(i >= texto.length) {
                 clearInterval(interval);
                 setTimeout(() => {
                     intro.style.opacity = '0';
-                    setTimeout(() => {
-                        intro.style.display = 'none';
-                        voarCamera();
-                    }, 1000);
+                    setTimeout(() => { intro.style.display = 'none'; voarCamera(); }, 1000);
                 }, 1500);
             }
         }, 100);
     }
 
     function voarCamera() {
-        cenaAtiva = true;
-        // Tween da posição da câmera (Vindo do céu para a rua)
         new TWEEN.Tween(camera.position)
-            .to({ x: 0, y: 15, z: 150 }, 6000)
+            .to({ x: 0, y: 100, z: -400 }, 5000)
             .easing(TWEEN.Easing.Quadratic.InOut)
-            .onComplete(() => {
-                // Fade para preto no final
-                document.getElementById('fade-overlay').style.opacity = '1';
-                document.getElementById('fade-overlay').style.transition = 'opacity 2s';
-            })
-            .start();
-
-        // Olhar para a pizzaria durante o vôo
-        const target = new THREE.Vector3(0, 5, 0);
-        new TWEEN.Tween(camera.position) // Dummy tween para o "lookAt"
-            .to({}, 6000)
-            .onUpdate(() => {
-                camera.lookAt(target);
-            })
+            .onUpdate(() => camera.lookAt(0, 0, -600))
+            .onComplete(prepararAcordar)
             .start();
     }
 
-    // --- RENDER LOOP ---
+    function prepararAcordar() {
+        const fade = document.getElementById('fade-overlay');
+        fade.style.opacity = '1';
+        fade.style.transition = 'opacity 1s';
+        
+        setTimeout(() => {
+            const tela = document.getElementById('tela-acordar');
+            tela.style.display = 'flex';
+            
+            // Criar 5 botões em posições aleatórias
+            for(let i=0; i<5; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'btn-acordar';
+                btn.innerText = 'ACORDAR';
+                btn.style.left = Math.random() * 80 + 10 + '%';
+                btn.style.top = Math.random() * 80 + 10 + '%';
+                btn.onclick = function() {
+                    this.style.display = 'none';
+                    botoesClicados++;
+                    if(botoesClicados === 5) realizarDespertar();
+                };
+                tela.appendChild(btn);
+            }
+        }, 1500);
+    }
+
+    function realizarDespertar() {
+        document.getElementById('tela-acordar').style.display = 'none';
+        document.getElementById('fade-overlay').style.opacity = '0';
+        
+        // Posicionar câmera dentro da casa
+        camera.position.set(0, 5, 5);
+        camera.lookAt(0, 5, 0);
+        lamp.intensity = 15; // Liga a luz da casa
+        
+        document.getElementById('instrucoes').style.display = 'block';
+
+        // Ativa controles de primeira pessoa ao clicar
+        document.addEventListener('click', () => {
+            controls.lock();
+        });
+    }
+
     function animate(time) {
         requestAnimationFrame(animate);
         TWEEN.update(time);
         renderer.render(scene, camera);
     }
     animate();
-
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
 </script>
 </body>
 </html>
