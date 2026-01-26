@@ -6,7 +6,7 @@
     <title>FNAF: No Safe Place</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; touch-action: none; }
-        #menu-inicial, #selecao-dispositivo, #intro-text, #tela-acordar {
+        #menu-inicial, #selecao-dispositivo, #intro-text {
             position: absolute; width: 100%; height: 100%;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             z-index: 100; transition: opacity 0.8s; background: black;
@@ -18,29 +18,17 @@
             transition: 0.3s; letter-spacing: 2px; margin: 10px; width: 250px;
         }
         button:hover { background: #8b0000; border-color: #f00; }
-        #tela-acordar { display: none; z-index: 300; }
-        .btn-acordar { position: absolute; border: 1px solid #8b0000; color: #ff0000; background: black; padding: 15px; cursor: pointer; border-radius: 50%; }
         #fade-overlay { position: absolute; width: 100%; height: 100%; background: black; opacity: 0; pointer-events: none; z-index: 200; }
-        #instrucoes { position: absolute; bottom: 20px; width: 100%; text-align: center; color: white; font-size: 0.8rem; z-index: 150; display: none; pointer-events: none; }
-        
-        /* Botão de Interagir com a Escada */
-        #btn-descer-escada {
-            position: absolute; bottom: 15%; left: 50%; transform: translateX(-50%);
-            display: none; z-index: 150; background: rgba(0,0,0,0.7); color: white;
-            border: 1px solid #aaa; padding: 15px 30px; cursor: pointer;
-            font-size: 1rem;
-        }
-
-        /* Controles Mobile */
-        #joystick-area { position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; display: none; z-index: 150; }
-        #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: rgba(255,255,255,0.3); border-radius: 50%; }
-        #btn-interagir { position: absolute; bottom: 50px; right: 50px; width: 80px; height: 80px; background: rgba(139,0,0,0.5); border: 2px solid #f00; border-radius: 50%; display: none; z-index: 150; color: white; font-weight: bold; }
+        #instrucoes { position: absolute; bottom: 20px; width: 100%; text-align: center; color: rgba(255,255,255,0.6); font-size: 0.8rem; z-index: 150; pointer-events: none; }
+        #joystick-area { position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.05); border-radius: 50%; display: none; z-index: 150; border: 1px solid rgba(255,255,255,0.1); }
+        #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 50%; }
+        #btn-descer { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px; background: rgba(0,0,0,0.8); color: white; border: 1px solid #8b0000; display: none; z-index: 160; }
     </style>
 </head>
 <body>
 
     <div id="fade-overlay"></div>
-    <div id="instrucoes">USE 'E' OU O BOTÃO 'USAR' PARA INTERAGIR</div>
+    <div id="instrucoes">OLHE PARA O INTERRUPTOR PARA LIGAR A LUZ</div>
 
     <div id="menu-inicial">
         <h1>FNAF:<br>NO SAFE PLACE</h1>
@@ -53,11 +41,10 @@
         <button onclick="configurarDispositivo('mobile')">CELULAR (TOUCH)</button>
     </div>
 
-    <div id="intro-text" style="display:none; color:white; font-size:1.2rem;"></div>
-    <div id="tela-acordar"></div>
+    <div id="intro-text" style="display:none; color:white; font-size:1.2rem; text-align: center;"></div>
+    
     <div id="joystick-area"><div id="joystick-stick"></div></div>
-    <button id="btn-interagir" onclick="interagir()">USAR</button>
-    <button id="btn-descer-escada" onclick="descerEscada()">DESCER ESCADA</button>
+    <button id="btn-descer" onclick="executarDescida()">DESCER ESCADAS</button>
 
 <script type="importmap">
     {
@@ -78,20 +65,12 @@
     let moveForward = 0, moveRight = 0;
     let luzLigada = false;
     let noAndarDeCima = true;
+    let walkTimer = 0;
+    const colidiveis = [];
 
-    // --- AUDIO SETUP ---
-    const listener = new THREE.AudioListener();
-    const clickSound = new THREE.Audio(listener);
-    const audioLoader = new THREE.AudioLoader();
-    audioLoader.load('https://actions.google.com/sounds/v1/household/light_switch_on.ogg', (buffer) => {
-        clickSound.setBuffer(buffer);
-        clickSound.setVolume(0.5);
-    });
-
-    // --- SETUP MUNDO ---
+    // --- SETUP ---
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.add(listener);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
@@ -99,131 +78,57 @@
     const controls = new PointerLockControls(camera, document.body);
 
     // --- LUZES ---
-    const luzQuarto = new THREE.PointLight(0xfff5e1, 0, 35); 
+    const luzQuarto = new THREE.PointLight(0xfff5e1, 0, 30);
     luzQuarto.position.set(0, 10, 0);
     scene.add(luzQuarto);
 
-    const luzCorredor = new THREE.PointLight(0xfff5e1, 0, 40);
-    luzCorredor.position.set(0, 10, 40);
-    scene.add(luzCorredor);
-
-    const luzSala = new THREE.PointLight(0xffe0a0, 0, 50); // Luz mais fraca para sala
-    luzSala.position.set(0, -5, 80); // Na sala (andar de baixo)
+    const luzSala = new THREE.PointLight(0xffaa44, 0, 50);
+    luzSala.position.set(0, -5, 80);
     scene.add(luzSala);
 
-    const luzAmbiente = new THREE.AmbientLight(0x404040, 0.05); // Luz ambiente geral
-    scene.add(luzAmbiente);
+    const luzCelular = new THREE.PointLight(0x00aaff, 0, 5); // Brilho do celular
+    scene.add(luzCelular);
 
-    const luzLua = new THREE.DirectionalLight(0x222244, 0.1); // Luz da lua
-    luzLua.position.set(0, 20, -20);
-    scene.add(luzLua);
+    // --- CONSTRUÇÃO ---
+    const matParede = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
+    const matChao = new THREE.MeshStandardMaterial({ color: 0x050505 });
+    const matMadeira = new THREE.MeshStandardMaterial({ color: 0x3d2b1f });
 
-    // --- MATERIAIS ---
-    const matWall = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, side: THREE.BackSide });
-    const matFloor = new THREE.MeshStandardMaterial({ color: 0x0f0f0f });
-    const matFurniture = new THREE.MeshStandardMaterial({ color: 0x221100 });
-    const matSwitch = new THREE.MeshStandardMaterial({ color: 0xcccccc });
-
-    // --- CONSTRUÇÃO: ANDAR DE CIMA ---
-    // Quarto
-    const quarto = new THREE.Mesh(new THREE.BoxGeometry(20, 12, 20), matWall);
-    quarto.position.set(0, 6, 0);
-    scene.add(quarto);
-
-    const chaoQuarto = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), matFloor);
-    chaoQuarto.rotation.x = -Math.PI / 2;
-    scene.add(chaoQuarto);
-
-    // Cama
-    const cama = new THREE.Mesh(new THREE.BoxGeometry(6, 2, 10), matFurniture);
-    cama.position.set(-6, 1, 4);
-    scene.add(cama);
-
-    // Interruptor
-    const switchBase = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.6, 0.3), matSwitch);
-    switchBase.position.set(-9.8, 5.5, 3);
-    scene.add(switchBase);
-
-    // Corredor
-    const corredor = new THREE.Mesh(new THREE.BoxGeometry(8, 12, 60), matWall);
-    corredor.position.set(0, 6, 40);
-    scene.add(corredor);
-
-    const chaoCorredor = new THREE.Mesh(new THREE.PlaneGeometry(8, 60), matFloor);
-    chaoCorredor.rotation.x = -Math.PI / 2;
-    chaoCorredor.position.set(0, 0.01, 40);
-    scene.add(chaoCorredor);
-
-    // Portas no corredor (apenas visuais)
-    for(let i=0; i<3; i++) {
-        const portaLateral = new THREE.Mesh(new THREE.BoxGeometry(0.2, 8, 4), matFurniture);
-        portaLateral.position.set(3.9, 4, 25 + (i * 12)); // Parede direita do corredor
-        scene.add(portaLateral);
-    }
-    
-    // Escada para baixo
-    const posEscada = new THREE.Vector3(-3.9, 0, 55); // Posição da entrada da escada
-    for(let j=0; j<10; j++) {
-        const degrau = new THREE.Mesh(new THREE.BoxGeometry(4, 0.5, 1.5), matFurniture);
-        degrau.position.set(posEscada.x, 0 - (j * 0.5) - 0.25, posEscada.z + (j * 1.5));
-        scene.add(degrau);
+    function addBox(w, h, d, x, y, z, mat, colide = true) {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+        mesh.position.set(x, y, z);
+        scene.add(mesh);
+        if(colide) colidiveis.push(mesh);
+        return mesh;
     }
 
-    // --- CONSTRUÇÃO: ANDAR DE BAIXO (SALA) ---
-    const sala = new THREE.Mesh(new THREE.BoxGeometry(30, 12, 30), matWall);
-    sala.position.set(0, -6, 80); // Abaixo e à frente da escada
-    scene.add(sala);
+    // Estrutura superior
+    addBox(22, 12, 1, 0, 6, -11, matParede); 
+    addBox(1, 12, 80, -11, 6, 30, matParede); 
+    addBox(1, 12, 80, 11, 6, 30, matParede);  
+    addBox(200, 1, 200, 0, -0.5, 0, matChao, false); 
 
-    const chaoSala = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), matFloor);
-    chaoSala.rotation.x = -Math.PI / 2;
-    chaoSala.position.set(0, -12.01, 80);
-    scene.add(chaoSala);
+    // Cama e Interruptor
+    const cama = addBox(6, 2, 10, -6, 1, 4, matMadeira);
+    const interruptor = addBox(0.2, 0.4, 0.3, -10.4, 5.5, 3, new THREE.MeshStandardMaterial({color: 0xffffff}), false);
 
+    // --- ANDAR DE BAIXO (SALA) ---
+    // Mesa
+    const tampoMesa = addBox(8, 0.5, 5, 0, -9, 85, matMadeira);
+    addBox(0.5, 3, 0.5, -3.5, -10.5, 83, matMadeira); // Pés da mesa
+    addBox(0.5, 3, 0.5, 3.5, -10.5, 83, matMadeira);
+    addBox(0.5, 3, 0.5, -3.5, -10.5, 87, matMadeira);
+    addBox(0.5, 3, 0.5, 3.5, -10.5, 87, matMadeira);
 
-    // --- LÓGICA DE INTERAÇÃO GERAL ('E' ou 'USAR') ---
-    window.interagir = () => {
-        const switchPos = new THREE.Vector3(-9.8, 5.5, 3); // Interruptor
-        const distSwitch = camera.position.distanceTo(switchPos);
-        
-        if(distSwitch < 7) {
-            luzLigada = !luzLigada;
-            luzQuarto.intensity = luzLigada ? 22 : 0;
-            luzCorredor.intensity = luzLigada ? 15 : 0; // Liga a luz do corredor junto
-            if(clickSound.buffer) clickSound.play();
-            if(luzLigada) document.getElementById('instrucoes').style.display = 'none';
-        }
-    };
+    // Celular em cima da mesa
+    const celular = addBox(0.4, 0.1, 0.8, 0, -8.7, 85, new THREE.MeshStandardMaterial({color: 0x111111}), false);
+    luzCelular.position.set(0, -8.5, 85);
 
-    // --- LÓGICA DE DESCER ESCADA ---
-    window.descerEscada = () => {
-        if (!noAndarDeCima) return; // Só pode descer se estiver em cima
+    // Portas de baixo
+    const portaMetal = addBox(4, 8, 0.3, -8, -8, 70, new THREE.MeshStandardMaterial({color: 0x444444})); // Trancada
+    const portaSala = addBox(4, 8, 0.3, 8, -8, 70, matMadeira); // Aberta
 
-        // Desativa controles durante a animação
-        controls.unlock();
-        document.getElementById('btn-descer-escada').style.display = 'none';
-        document.getElementById('instrucoes').style.display = 'none';
-
-        // Animação de descida
-        new TWEEN.Tween(camera.position)
-            .to({ x: posEscada.x, y: -5, z: posEscada.z + 15 }, 4000) // Posição final na sala
-            .easing(TWEEN.Easing.Quadratic.InOut)
-            .onUpdate(() => {
-                camera.lookAt(posEscada.x, -5, posEscada.z + 25); // Olhar para dentro da sala
-            })
-            .onComplete(() => {
-                noAndarDeCima = false;
-                luzQuarto.intensity = 0; // Apaga luz do andar de cima
-                luzCorredor.intensity = 0;
-                luzSala.intensity = 15; // Acende luz da sala
-                document.getElementById('instrucoes').innerText = "Você está na sala. WASD para andar.";
-                document.getElementById('instrucoes').style.display = 'block';
-                // Reativa controles
-                if(dispositivo === 'pc') controls.lock();
-            })
-            .start();
-    };
-
-    // --- FUNÇÕES DE MENU E INTRODUÇÃO (mantidas) ---
+    // --- LOGICA DE JOGO ---
     window.irParaSelecao = () => {
         document.getElementById('menu-inicial').style.display = 'none';
         document.getElementById('selecao-dispositivo').style.display = 'flex';
@@ -232,55 +137,40 @@
     window.configurarDispositivo = (tipo) => {
         dispositivo = tipo;
         document.getElementById('selecao-dispositivo').style.display = 'none';
-        if(dispositivo === 'mobile') {
-            document.getElementById('joystick-area').style.display = 'block';
-            document.getElementById('btn-interagir').style.display = 'block';
-        }
-        animarTexto();
+        if(dispositivo === 'mobile') document.getElementById('joystick-area').style.display = 'block';
+        despertar();
     };
 
-    function animarTexto() {
-        const intro = document.getElementById('intro-text');
-        intro.style.display = 'flex';
-        const txt = "FNAF: NO SAFE PLACE"; let i = 0;
-        const int = setInterval(() => {
-            intro.innerText += txt[i++];
-            if(i >= txt.length) { clearInterval(int); setTimeout(voar, 1000); }
-        }, 80);
+    function despertar() {
+        camera.position.set(-6, 5, 4);
+        if(dispositivo === 'pc') document.addEventListener('click', () => controls.lock());
     }
 
-    function voar() {
-        document.getElementById('intro-text').style.opacity = '0';
-        new TWEEN.Tween(camera.position).to({ x: 0, y: 20, z: -40 }, 3000)
-            .onUpdate(() => camera.lookAt(0, 0, -60))
-            .onComplete(() => {
-                document.getElementById('fade-overlay').style.opacity = '1';
-                setTimeout(initAcordar, 1000);
-            }).start();
-    }
-
-    function initAcordar() {
-        const tela = document.getElementById('tela-acordar');
-        tela.style.display = 'flex';
-        let c = 0;
-        for(let i=0; i<5; i++) {
-            const b = document.createElement('button');
-            b.className = 'btn-acordar'; b.innerText = 'TAP';
-            b.style.left = (Math.random()*60+20)+'%'; b.style.top = (Math.random()*60+20)+'%';
-            b.onclick = () => { b.style.display='none'; if(++c === 5) despertar(); };
-            tela.appendChild(b);
+    function interagir() {
+        // Distância do Interruptor
+        if(camera.position.distanceTo(interruptor.position) < 5) {
+            luzLigada = !luzLigada;
+            luzQuarto.intensity = luzLigada ? 20 : 0;
+        }
+        // Distância do Celular
+        if(camera.position.distanceTo(celular.position) < 5) {
+            luzCelular.intensity = 5;
+            document.getElementById('instrucoes').innerText = "Você recebeu uma mensagem...";
         }
     }
 
-    function despertar() {
-        document.getElementById('tela-acordar').style.display = 'none';
-        document.getElementById('fade-overlay').style.opacity = '0';
-        camera.position.set(-6, 5, 4); // Na cama
-        document.getElementById('instrucoes').style.display = 'block';
-        if(dispositivo === 'pc') document.addEventListener('mousedown', () => controls.lock());
-    }
+    window.executarDescida = () => {
+        document.getElementById('btn-descer').style.display = 'none';
+        new TWEEN.Tween(camera.position).to({x: 0, y: -8, z: 75}, 3000)
+            .easing(TWEEN.Easing.Quadratic.InOut)
+            .onComplete(() => {
+                noAndarDeCima = false;
+                luzSala.intensity = 15;
+                document.getElementById('instrucoes').innerText = "Encontre o celular na mesa.";
+            }).start();
+    };
 
-    // --- CONTROLES PC ---
+    // Teclado
     const keys = {};
     document.addEventListener('keydown', (e) => {
         keys[e.code] = true;
@@ -288,65 +178,64 @@
     });
     document.addEventListener('keyup', (e) => keys[e.code] = false);
 
-    // --- CONTROLES MOBILE ---
-    if('ontouchstart' in window) {
-        const area = document.getElementById('joystick-area');
-        const stick = document.getElementById('joystick-stick');
-        area.addEventListener('touchmove', (e) => {
-            const touch = e.touches[0];
-            const rect = area.getBoundingClientRect();
-            const x = touch.clientX - rect.left - 60;
-            const y = touch.clientY - rect.top - 60;
-            const dist = Math.min(Math.sqrt(x*x + y*y), 40);
-            const angle = Math.atan2(y, x);
-            stick.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
-            moveForward = -Math.sin(angle) * (dist/40);
-            moveRight = Math.cos(angle) * (dist/40);
-        });
-        area.addEventListener('touchend', () => {
-            moveForward = 0; moveRight = 0;
-            stick.style.transform = `translate(0,0)`;
-        });
-        let lastX, lastY;
-        window.addEventListener('touchmove', (e) => {
-            if(e.target.id.includes('joystick') || e.target.id === 'btn-interagir' || e.target.id === 'btn-descer-escada') return;
-            const t = e.touches[0];
-            if(lastX) {
-                camera.rotation.y -= (t.clientX - lastX) * 0.005;
-                camera.rotation.x -= (t.clientY - lastY) * 0.005;
-            }
-            lastX = t.clientX; lastY = t.clientY;
-        });
-        window.addEventListener('touchend', () => { lastX = null; lastY = null; });
-    }
+    // Mobile Interact
+    renderer.domElement.addEventListener('touchstart', (e) => {
+        if(e.target.id !== 'joystick-area') interagir();
+    });
 
-    // --- LOOP DE ANIMAÇÃO ---
+    // Mobile Joystick
+    const area = document.getElementById('joystick-area');
+    const stick = document.getElementById('joystick-stick');
+    area.addEventListener('touchmove', (e) => {
+        const touch = e.touches[0];
+        const rect = area.getBoundingClientRect();
+        const x = touch.clientX - rect.left - 60;
+        const y = touch.clientY - rect.top - 60;
+        const dist = Math.min(Math.sqrt(x*x+y*y), 40);
+        const angle = Math.atan2(y, x);
+        stick.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
+        moveForward = -Math.sin(angle) * (dist/40);
+        moveRight = Math.cos(angle) * (dist/40);
+    });
+    area.addEventListener('touchend', () => { moveForward = 0; moveRight = 0; stick.style.transform = 'translate(0,0)'; });
+
     function animate() {
         requestAnimationFrame(animate);
         TWEEN.update();
-        const speed = 0.2;
 
-        if (controls.isLocked || dispositivo === 'mobile') { // Controles ativos
-            if(dispositivo === 'pc' && controls.isLocked) {
+        const speed = 0.08; 
+        let prevPos = camera.position.clone();
+
+        if(controls.isLocked || dispositivo === 'mobile') {
+            if(dispositivo === 'pc') {
                 if(keys['KeyW']) controls.moveForward(speed);
                 if(keys['KeyS']) controls.moveForward(-speed);
                 if(keys['KeyA']) controls.moveRight(-speed);
                 if(keys['KeyD']) controls.moveRight(speed);
-            } else if(dispositivo === 'mobile') {
+            } else {
                 camera.translateZ(-moveForward * speed);
                 camera.translateX(moveRight * speed);
-                camera.position.y = 5;
             }
 
-            // Lógica para mostrar/esconder o botão "DESCER ESCADA"
-            const distEscada = camera.position.distanceTo(posEscada);
-            if (distEscada < 10 && noAndarDeCima) {
-                document.getElementById('btn-descer-escada').style.display = 'block';
+            // Colisao
+            colidiveis.forEach(obj => {
+                const box = new THREE.Box3().setFromObject(obj);
+                if(box.containsPoint(camera.position)) camera.position.copy(prevPos);
+            });
+
+            // Head Bobbing
+            if(camera.position.distanceTo(prevPos) > 0.01) {
+                walkTimer += 0.12;
+                camera.position.y = (noAndarDeCima ? 5 : -8) + Math.sin(walkTimer) * 0.1;
+            }
+
+            // Ativar botão de descida no fim do corredor
+            if(noAndarDeCima && camera.position.z > 50) {
+                document.getElementById('btn-descer').style.display = 'block';
             } else {
-                document.getElementById('btn-descer-escada').style.display = 'none';
+                document.getElementById('btn-descer').style.display = 'none';
             }
         }
-        
         renderer.render(scene, camera);
     }
     animate();
