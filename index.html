@@ -2,39 +2,49 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>FNAF: No Safe Place</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; }
-        #menu-inicial, #intro-text, #tela-acordar {
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; touch-action: none; }
+        #menu-inicial, #selecao-dispositivo, #intro-text, #tela-acordar {
             position: absolute; width: 100%; height: 100%;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 100; transition: opacity 1s;
+            z-index: 100; transition: opacity 0.8s; background: black;
         }
-        #menu-inicial { background: #000; }
-        h1 { color: #8b0000; font-size: 2.5rem; text-shadow: 0 0 10px #f00; text-align: center; }
+        h1 { color: #8b0000; font-size: 2rem; text-shadow: 0 0 10px #f00; text-align: center; }
         button {
-            padding: 12px 30px; font-size: 1rem; background: transparent;
+            padding: 15px 30px; font-size: 1rem; background: transparent;
             color: white; border: 1px solid #444; cursor: pointer;
-            transition: 0.3s; letter-spacing: 2px; margin: 10px;
+            transition: 0.3s; letter-spacing: 2px; margin: 10px; width: 250px;
         }
         button:hover { background: #8b0000; border-color: #f00; }
-        #tela-acordar { display: none; background: black; z-index: 300; }
-        .btn-acordar { position: absolute; border: 1px solid #8b0000; color: #ff0000; background: black; padding: 10px; cursor: pointer; }
+        #tela-acordar { display: none; z-index: 300; }
+        .btn-acordar { position: absolute; border: 1px solid #8b0000; color: #ff0000; background: black; padding: 15px; cursor: pointer; border-radius: 50%; }
         #fade-overlay { position: absolute; width: 100%; height: 100%; background: black; opacity: 0; pointer-events: none; z-index: 200; }
-        #instrucoes { position: absolute; bottom: 20px; width: 100%; text-align: center; color: white; font-size: 0.7rem; z-index: 150; display: none; }
+        
+        /* Controles Celular */
+        #joystick-area { position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; display: none; z-index: 150; }
+        #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: rgba(255,255,255,0.3); border-radius: 50%; }
     </style>
 </head>
 <body>
 
     <div id="fade-overlay"></div>
+
     <div id="menu-inicial">
         <h1>FNAF:<br>NO SAFE PLACE</h1>
-        <button onclick="iniciarJogo()">COMEÇAR JOGO</button>
+        <button onclick="irParaSelecao()">JOGAR</button>
     </div>
-    <div id="intro-text" style="display:none; color:white; font-size:1.5rem; background:black; text-align: center;"></div>
+
+    <div id="selecao-dispositivo" style="display: none;">
+        <h2 style="color: white;">ONDE VOCÊ ESTÁ JOGANDO?</h2>
+        <button onclick="configurarDispositivo('pc')">COMPUTADOR (WASD)</button>
+        <button onclick="configurarDispositivo('mobile')">CELULAR (TOUCH)</button>
+    </div>
+
+    <div id="intro-text" style="display:none; color:white; font-size:1.2rem;"></div>
     <div id="tela-acordar"></div>
-    <div id="instrucoes">WASD: ANDAR | MOUSE: OLHAR</div>
+    <div id="joystick-area"><div id="joystick-stick"></div></div>
 
 <script type="importmap">
     {
@@ -51,7 +61,10 @@
     import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
     import TWEEN from 'tween';
 
-    // --- SETUP ---
+    let dispositivo = 'pc';
+    let moveForward = 0, moveRight = 0;
+
+    // --- SETUP MUNDO ---
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -60,82 +73,36 @@
 
     const controls = new PointerLockControls(camera, document.body);
 
-    // --- LUZES (Aumentadas para visibilidade) ---
-    const luzAmbiente = new THREE.AmbientLight(0xffffff, 0.05);
-    scene.add(luzAmbiente);
-
-    const luzQuarto = new THREE.PointLight(0xffaa44, 0, 40); // Começa desligada
+    // Iluminação mais branca/suave para tirar o excesso de vermelho
+    const luzQuarto = new THREE.PointLight(0xffffff, 0, 35); 
     luzQuarto.position.set(0, 8, 0);
     scene.add(luzQuarto);
+    scene.add(new THREE.AmbientLight(0x404040, 0.1));
 
-    const luzCorredor = new THREE.PointLight(0xffaa44, 0, 30);
-    luzCorredor.position.set(0, 8, 40);
-    scene.add(luzCorredor);
-
-    // --- CONSTRUÇÃO DA CASA ---
-    const materialParede = new THREE.MeshStandardMaterial({ color: 0x3d2b1f, side: THREE.BackSide });
-    const materialChao = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
-    const materialPorta = new THREE.MeshStandardMaterial({ color: 0x150b05 });
-
-    // 1. O QUARTO
-    const quarto = new THREE.Mesh(new THREE.BoxGeometry(20, 12, 20), materialParede);
+    // --- CONSTRUÇÃO (QUARTO E CORREDOR) ---
+    const matWall = new THREE.MeshStandardMaterial({ color: 0x221111, side: THREE.BackSide });
+    const quarto = new THREE.Mesh(new THREE.BoxGeometry(20, 12, 20), matWall);
     quarto.position.set(0, 6, 0);
     scene.add(quarto);
 
-    const chaoQuarto = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), materialChao);
-    chaoQuarto.rotation.x = -Math.PI / 2;
-    scene.add(chaoQuarto);
-
-    // Cama
-    const cama = new THREE.Mesh(new THREE.BoxGeometry(6, 2, 10), new THREE.MeshStandardMaterial({color: 0x442211}));
+    const cama = new THREE.Mesh(new THREE.BoxGeometry(6, 2, 10), new THREE.MeshStandardMaterial({color: 0x331a00}));
     cama.position.set(-6, 1, 4);
     scene.add(cama);
 
-    // Porta do Quarto (Abertura)
-    const porta = new THREE.Mesh(new THREE.BoxGeometry(4, 8, 0.5), materialPorta);
-    porta.position.set(0, 4, 9.8);
-    scene.add(porta);
-
-    // 2. CORREDOR
-    const corredor = new THREE.Mesh(new THREE.BoxGeometry(8, 12, 60), materialParede);
+    const corredor = new THREE.Mesh(new THREE.BoxGeometry(8, 12, 60), matWall);
     corredor.position.set(0, 6, 40);
     scene.add(corredor);
 
-    const chaoCorredor = new THREE.Mesh(new THREE.PlaneGeometry(8, 60), materialChao);
-    chaoCorredor.rotation.x = -Math.PI / 2;
-    chaoCorredor.position.set(0, 0.01, 40);
-    scene.add(chaoCorredor);
-
-    // Portas Laterais e Escada
-    for(let i=0; i<3; i++) {
-        const pLateral = new THREE.Mesh(new THREE.BoxGeometry(0.2, 8, 4), materialPorta);
-        pLateral.position.set(3.9, 4, 25 + (i * 12));
-        scene.add(pLateral);
-        
-        // Se for a última porta, coloca a escada atrás
-        if(i === 2) {
-            for(let j=0; j<10; j++) {
-                const degrau = new THREE.Mesh(new THREE.BoxGeometry(4, 0.5, 1.5), materialPorta);
-                degrau.position.set(6, 4 - (j * 0.5), 49 + (j * 1.5));
-                scene.add(degrau);
-            }
-        }
-    }
-
-    // --- CIDADE (INTRODUÇÃO) ---
-    const cidade = new THREE.Group();
-    for(let i=0; i<40; i++) {
-        const b = new THREE.Mesh(new THREE.BoxGeometry(4, 10 + Math.random()*30, 4), new THREE.MeshStandardMaterial({color: 0x050510}));
-        b.position.set(Math.random()*100-50, 0, -50 - Math.random()*50);
-        cidade.add(b);
-    }
-    scene.add(cidade);
-
-    // --- LÓGICA ---
-    camera.position.set(0, 50, 100);
-
-    window.iniciarJogo = () => {
+    // --- FUNÇÕES DE MENU ---
+    window.irParaSelecao = () => {
         document.getElementById('menu-inicial').style.display = 'none';
+        document.getElementById('selecao-dispositivo').style.display = 'flex';
+    };
+
+    window.configurarDispositivo = (tipo) => {
+        dispositivo = tipo;
+        document.getElementById('selecao-dispositivo').style.display = 'none';
+        if(dispositivo === 'mobile') document.getElementById('joystick-area').style.display = 'block';
         animarTexto();
     };
 
@@ -143,19 +110,16 @@
         const intro = document.getElementById('intro-text');
         intro.style.display = 'flex';
         const txt = "FNAF: NO SAFE PLACE"; let i = 0;
-        const interval = setInterval(() => {
+        const int = setInterval(() => {
             intro.innerText += txt[i++];
-            if(i >= txt.length) {
-                clearInterval(interval);
-                setTimeout(voar, 1000);
-            }
-        }, 100);
+            if(i >= txt.length) { clearInterval(int); setTimeout(voar, 1000); }
+        }, 80);
     }
 
     function voar() {
         document.getElementById('intro-text').style.opacity = '0';
-        new TWEEN.Tween(camera.position).to({ x: 0, y: 10, z: -30 }, 3000)
-            .onUpdate(() => camera.lookAt(0, 0, -60))
+        new TWEEN.Tween(camera.position).to({ x: 0, y: 15, z: -30 }, 3000)
+            .onUpdate(() => camera.lookAt(0, 0, -50))
             .onComplete(() => {
                 document.getElementById('fade-overlay').style.opacity = '1';
                 setTimeout(initAcordar, 1000);
@@ -165,12 +129,12 @@
     function initAcordar() {
         const tela = document.getElementById('tela-acordar');
         tela.style.display = 'flex';
-        let cliques = 0;
+        let c = 0;
         for(let i=0; i<5; i++) {
             const b = document.createElement('button');
-            b.className = 'btn-acordar'; b.innerText = 'ACORDAR';
+            b.className = 'btn-acordar'; b.innerText = 'TAP';
             b.style.left = (Math.random()*60+20)+'%'; b.style.top = (Math.random()*60+20)+'%';
-            b.onclick = () => { b.style.display='none'; if(++cliques === 5) despertar(); };
+            b.onclick = () => { b.style.display='none'; if(++c === 5) despertar(); };
             tela.appendChild(b);
         }
     }
@@ -178,37 +142,65 @@
     function despertar() {
         document.getElementById('tela-acordar').style.display = 'none';
         document.getElementById('fade-overlay').style.opacity = '0';
-        
-        // POSIÇÃO DE ACORDAR (No Quarto)
-        camera.position.set(-6, 4, 4); // Em cima da cama
-        camera.lookAt(0, 4, 9); // Olhando para a porta
-        luzQuarto.intensity = 30; // ACENDE A LUZ
-        luzCorredor.intensity = 15;
-
-        document.getElementById('instrucoes').style.display = 'block';
-        document.addEventListener('mousedown', () => controls.lock());
+        camera.position.set(-6, 5, 4);
+        luzQuarto.intensity = 20;
+        if(dispositivo === 'pc') document.addEventListener('mousedown', () => controls.lock());
     }
 
-    const move = { f: false, b: false, l: false, r: false };
-    document.addEventListener('keydown', (e) => {
-        if(e.code === 'KeyW') move.f = true; if(e.code === 'KeyS') move.b = true;
-        if(e.code === 'KeyA') move.l = true; if(e.code === 'KeyD') move.r = true;
-    });
-    document.addEventListener('keyup', (e) => {
-        if(e.code === 'KeyW') move.f = false; if(e.code === 'KeyS') move.b = false;
-        if(e.code === 'KeyA') move.l = false; if(e.code === 'KeyD') move.r = false;
-    });
+    // --- CONTROLES MOBILE (JOYSTICK) ---
+    if('ontouchstart' in window) {
+        const area = document.getElementById('joystick-area');
+        const stick = document.getElementById('joystick-stick');
+        area.addEventListener('touchmove', (e) => {
+            const touch = e.touches[0];
+            const rect = area.getBoundingClientRect();
+            const x = touch.clientX - rect.left - 60;
+            const y = touch.clientY - rect.top - 60;
+            const dist = Math.min(Math.sqrt(x*x + y*y), 40);
+            const angle = Math.atan2(y, x);
+            stick.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
+            moveForward = -Math.sin(angle) * (dist/40);
+            moveRight = Math.cos(angle) * (dist/40);
+        });
+        area.addEventListener('touchend', () => {
+            stick.style.transform = `translate(0,0)`;
+            moveForward = 0; moveRight = 0;
+        });
+        // Olhar no mobile (arrastar tela)
+        let lastX, lastY;
+        window.addEventListener('touchmove', (e) => {
+            if(e.target.id === 'joystick-area' || e.target.id === 'joystick-stick') return;
+            const t = e.touches[0];
+            if(lastX) {
+                camera.rotation.y -= (t.clientX - lastX) * 0.005;
+                camera.rotation.x -= (t.clientY - lastY) * 0.005;
+            }
+            lastX = t.clientX; lastY = t.clientY;
+        });
+        window.addEventListener('touchend', () => { lastX = null; lastY = null; });
+    }
+
+    // --- CONTROLES PC ---
+    const keys = {};
+    document.addEventListener('keydown', (e) => keys[e.code] = true);
+    document.addEventListener('keyup', (e) => keys[e.code] = false);
 
     function animate() {
         requestAnimationFrame(animate);
         TWEEN.update();
-        if(controls.isLocked) {
-            const speed = 0.2;
-            if(move.f) controls.moveForward(speed);
-            if(move.b) controls.moveForward(-speed);
-            if(move.l) controls.moveRight(-speed);
-            if(move.r) controls.moveRight(speed);
+        
+        const speed = 0.2;
+        if(dispositivo === 'pc' && controls.isLocked) {
+            if(keys['KeyW']) controls.moveForward(speed);
+            if(keys['KeyS']) controls.moveForward(-speed);
+            if(keys['KeyA']) controls.moveRight(-speed);
+            if(keys['KeyD']) controls.moveRight(speed);
+        } else if(dispositivo === 'mobile') {
+            camera.translateZ(-moveForward * speed);
+            camera.translateX(moveRight * speed);
+            camera.position.y = 5; // Manter altura fixa
         }
+        
         renderer.render(scene, camera);
     }
     animate();
