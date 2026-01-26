@@ -1,274 +1,118 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Neon Odyssey</title>
-
-<style>
-body {
-    margin: 0;
-    overflow: hidden;
-    background: black;
-    font-family: monospace;
-}
-
-canvas {
-    display: block;
-}
-
-/* HUD */
-#hud {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    color: #00fff7;
-    font-size: 14px;
-    text-shadow: 0 0 5px #00fff7;
-}
-
-.bar {
-    width: 150px;
-    height: 10px;
-    background: #222;
-    margin-top: 5px;
-    border: 1px solid #00fff7;
-}
-
-.bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #00ff99, #00fff7);
-}
-
-/* Dialog */
-#dialog-box {
-    position: absolute;
-    bottom: 20px;
-    left: 10%;
-    width: 80%;
-    background: rgba(0,0,0,0.85);
-    border: 2px solid #ff2e63;
-    color: white;
-    padding: 15px;
-    display: none;
-}
-
-button {
-    background: #ff2e63;
-    border: none;
-    padding: 10px;
-    color: white;
-    margin-top: 10px;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minha Cidade 3D Noturna</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        canvas { display: block; }
+    </style>
 </head>
-
 <body>
 
-<div id="hud">
-    HP
-    <div class="bar"><div id="hpbar" class="bar-fill"></div></div>
-    XP
-    <div class="bar"><div id="xpbar" class="bar-fill"></div></div>
-    Moedas: <span id="coins">0</span><br>
-    Level: <span id="level">1</span>
-</div>
-
-<div id="dialog-box">
-    <p id="dialog-text"></p>
-    <button onclick="closeDialog()">Fechar</button>
-    <button id="buyBtn" onclick="buyPotion()" style="display:none;">Comprar Poção (10)</button>
-</div>
-
-<canvas id="game"></canvas>
-
-<script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-
-canvas.width = innerWidth;
-canvas.height = innerHeight;
-
-/* Estado */
-let gameActive = true;
-let particles = [];
-
-let player = {
-    x: 200,
-    y: 200,
-    size: 25,
-    hp: 100,
-    maxHp: 100,
-    xp: 0,
-    level: 1,
-    coins: 0,
-    speed: 3,
-    attackCooldown: 0
-};
-
-let joystick = {active:false,x:0,y:0,cx:0,cy:0};
-
-let entities = [];
-
-/* Level */
-function init() {
-    entities = [
-        {type:'npc',x:300,y:200,text:'A cidade está viva...'},
-        {type:'shop',x:500,y:300,text:'Sobreviva melhor.'},
-        {type:'mob',x:400,y:400,hp:30},
-        {type:'mob',x:600,y:200,hp:30}
-    ];
-}
-
-/* Partículas */
-function spawnParticle(x,y,color) {
-    particles.push({
-        x,y,
-        vx:(Math.random()-0.5)*2,
-        vy:(Math.random()-0.5)*2,
-        life:30,
-        color
-    });
-}
-
-/* Touch */
-canvas.addEventListener("touchstart",e=>{
-    joystick.active=true;
-    joystick.x=e.touches[0].clientX;
-    joystick.y=e.touches[0].clientY;
-});
-
-canvas.addEventListener("touchmove",e=>{
-    joystick.cx=e.touches[0].clientX;
-    joystick.cy=e.touches[0].clientY;
-});
-
-canvas.addEventListener("touchend",()=>joystick.active=false);
-
-/* Ataque */
-canvas.addEventListener("click", attack);
-
-function attack() {
-    if(player.attackCooldown>0) return;
-    player.attackCooldown=20;
-
-    entities.forEach(e=>{
-        if(e.type==="mob"){
-            let d=Math.hypot(player.x-e.x,player.y-e.y);
-            if(d<60){
-                e.hp-=20;
-                spawnParticle(e.x,e.y,"#ff004c");
-            }
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
         }
-    });
-}
+    }
+</script>
 
-/* Update */
-function update() {
-    if(!gameActive) return;
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-    if(joystick.active){
-        let dx=joystick.cx-joystick.x;
-        let dy=joystick.cy-joystick.y;
-        let d=Math.hypot(dx,dy);
-        if(d>10){
-            player.x+=(dx/d)*player.speed;
-            player.y+=(dy/d)*player.speed;
+    // 1. Configuração Básica
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x020205); // Céu quase preto
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Controle de câmera (clique e arraste para olhar ao redor)
+    const controls = new OrbitControls(camera, renderer.domElement);
+    camera.position.set(0, 20, 50);
+    controls.update();
+
+    // 2. Iluminação
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Luz ambiente fraca
+    scene.add(ambientLight);
+
+    const moonLight = new THREE.DirectionalLight(0xffffff, 0.8); // Luz da lua
+    moonLight.position.set(50, 100, -50);
+    scene.add(moonLight);
+
+    // 3. Estrelas
+    const starGeometry = new THREE.BufferGeometry();
+    const starMaterial = new THREE.PointsMaterial({ color: 0xffffff });
+    const starVertices = [];
+    for (let i = 0; i < 5000; i++) {
+        const x = (Math.random() - 0.5) * 1000;
+        const y = Math.random() * 500;
+        const z = (Math.random() - 0.5) * 1000;
+        starVertices.push(x, y, z);
+    }
+    starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+    const stars = new THREE.Points(starGeometry, starMaterial);
+    scene.add(stars);
+
+    // 4. A Lua
+    const moonGeo = new THREE.SphereGeometry(5, 32, 32);
+    const moonMat = new THREE.MeshBasicMaterial({ color: 0xffffeb });
+    const moon = new THREE.Mesh(moonGeo, moonMat);
+    moon.position.set(40, 80, -100);
+    scene.add(moon);
+
+    // 5. Chão (Asfalto)
+    const floorGeo = new THREE.PlaneGeometry(1000, 1000);
+    const floorMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    // 6. Criando Prédios e Casas (Procedural)
+    function createBuilding(x, z) {
+        const h = Math.random() * 20 + 5; // Altura aleatória
+        const w = Math.random() * 5 + 2;  // Largura aleatória
+        const geo = new THREE.BoxGeometry(w, h, w);
+        const mat = new THREE.MeshPhongMaterial({ color: 0x222244 }); // Cor azulada noturna
+        const building = new THREE.Mesh(geo, mat);
+        building.position.set(x, h/2, z);
+        scene.add(building);
+
+        // Adicionar janelas iluminadas simples
+        const windowGeo = new THREE.BoxGeometry(w + 0.1, 0.5, 0.5);
+        const windowMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        for(let j = 1; j < h; j += 3) {
+            const win = new THREE.Mesh(windowGeo, windowMat);
+            win.position.set(x, j, z);
+            scene.add(win);
         }
     }
 
-    if(player.attackCooldown>0) player.attackCooldown--;
-
-    entities = entities.filter(e=>{
-        if(e.type==="mob" && e.hp<=0){
-            player.xp+=20;
-            player.coins+=5;
-            return false;
-        }
-        return true;
-    });
-
-    if(player.xp>=100){
-        player.xp=0;
-        player.level++;
-        player.maxHp+=20;
-        player.hp=player.maxHp;
+    // Gerar uma mini cidade
+    for (let i = 0; i < 40; i++) {
+        createBuilding(Math.random() * 100 - 50, Math.random() * 100 - 50);
     }
 
-    particles.forEach(p=>{
-        p.x+=p.vx;
-        p.y+=p.vy;
-        p.life--;
-    });
-
-    particles=particles.filter(p=>p.life>0);
-}
-
-/* Draw */
-function draw() {
-    ctx.fillStyle="#070720";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    /* Grade neon */
-    ctx.strokeStyle="rgba(0,255,255,0.05)";
-    for(let i=0;i<canvas.width;i+=50){
-        ctx.beginPath();
-        ctx.moveTo(i,0);
-        ctx.lineTo(i,canvas.height);
-        ctx.stroke();
+    // 7. Loop de Animação
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
     }
 
-    entities.forEach(e=>{
-        ctx.fillStyle = e.type==="mob"?"#ff004c": e.type==="shop"?"#f5c542":"#00ff99";
-        ctx.beginPath();
-        ctx.arc(e.x,e.y,20,0,Math.PI*2);
-        ctx.fill();
+    // Ajustar tamanho na redimensionamento da janela
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    particles.forEach(p=>{
-        ctx.fillStyle=p.color;
-        ctx.fillRect(p.x,p.y,3,3);
-    });
-
-    ctx.fillStyle="#00d9ff";
-    ctx.fillRect(player.x-12,player.y-12,25,25);
-
-    document.getElementById("hpbar").style.width =
-        (player.hp/player.maxHp*100)+"%";
-    document.getElementById("xpbar").style.width =
-        (player.xp/100*100)+"%";
-    document.getElementById("coins").innerText=player.coins;
-    document.getElementById("level").innerText=player.level;
-
-    requestAnimationFrame(()=>{
-        update();
-        draw();
-    });
-}
-
-/* Diálogo */
-function showDialog(text,isShop=false){
-    gameActive=false;
-    document.getElementById("dialog-box").style.display="block";
-    document.getElementById("dialog-text").innerText=text;
-    document.getElementById("buyBtn").style.display=isShop?"block":"none";
-}
-
-function closeDialog(){
-    gameActive=true;
-    document.getElementById("dialog-box").style.display="none";
-}
-
-function buyPotion(){
-    if(player.coins>=10){
-        player.coins-=10;
-        player.hp=Math.min(player.maxHp,player.hp+40);
-    }
-}
-
-/* Start */
-init();
-draw();
+    animate();
 </script>
 </body>
-    </html>
+</html>
