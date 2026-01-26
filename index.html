@@ -28,7 +28,7 @@
 <body>
 
     <div id="fade-overlay"></div>
-    <div id="instrucoes">OLHE PARA O INTERRUPTOR PARA LIGAR A LUZ</div>
+    <div id="instrucoes">EXPLORE A CASA</div>
 
     <div id="menu-inicial">
         <h1>FNAF:<br>NO SAFE PLACE</h1>
@@ -37,7 +37,7 @@
 
     <div id="selecao-dispositivo" style="display: none;">
         <h2 style="color: white;">DISPOSITIVO</h2>
-        <button onclick="configurarDispositivo('pc')">PC (WASD + E)</button>
+        <button onclick="configurarDispositivo('pc')">PC (WASD)</button>
         <button onclick="configurarDispositivo('mobile')">CELULAR (TOUCH)</button>
     </div>
 
@@ -63,7 +63,6 @@
 
     let dispositivo = 'pc';
     let moveForward = 0, moveRight = 0;
-    let luzLigada = false;
     let noAndarDeCima = true;
     let walkTimer = 0;
     const colidiveis = [];
@@ -77,16 +76,20 @@
 
     const controls = new PointerLockControls(camera, document.body);
 
-    // --- LUZES ---
-    const luzQuarto = new THREE.PointLight(0xfff5e1, 0, 30);
+    // --- LUZES (Sempre Ligadas) ---
+    const luzQuarto = new THREE.PointLight(0xfff5e1, 20, 40);
     luzQuarto.position.set(0, 10, 0);
     scene.add(luzQuarto);
 
-    const luzSala = new THREE.PointLight(0xffaa44, 0, 50);
+    const luzCorredor = new THREE.PointLight(0xfff5e1, 15, 50);
+    luzCorredor.position.set(0, 10, 30);
+    scene.add(luzCorredor);
+
+    const luzSala = new THREE.PointLight(0xffaa44, 15, 60);
     luzSala.position.set(0, -5, 80);
     scene.add(luzSala);
 
-    const luzCelular = new THREE.PointLight(0x00aaff, 0, 5); // Brilho do celular
+    const luzCelular = new THREE.PointLight(0x00aaff, 2, 5); 
     scene.add(luzCelular);
 
     // --- CONSTRUÇÃO ---
@@ -102,33 +105,23 @@
         return mesh;
     }
 
-    // Estrutura superior
+    // Estrutura
     addBox(22, 12, 1, 0, 6, -11, matParede); 
-    addBox(1, 12, 80, -11, 6, 30, matParede); 
-    addBox(1, 12, 80, 11, 6, 30, matParede);  
+    addBox(1, 12, 100, -11, 6, 40, matParede); 
+    addBox(1, 12, 100, 11, 6, 40, matParede);  
     addBox(200, 1, 200, 0, -0.5, 0, matChao, false); 
 
-    // Cama e Interruptor
     const cama = addBox(6, 2, 10, -6, 1, 4, matMadeira);
-    const interruptor = addBox(0.2, 0.4, 0.3, -10.4, 5.5, 3, new THREE.MeshStandardMaterial({color: 0xffffff}), false);
 
-    // --- ANDAR DE BAIXO (SALA) ---
-    // Mesa
+    // ANDAR DE BAIXO
     const tampoMesa = addBox(8, 0.5, 5, 0, -9, 85, matMadeira);
-    addBox(0.5, 3, 0.5, -3.5, -10.5, 83, matMadeira); // Pés da mesa
-    addBox(0.5, 3, 0.5, 3.5, -10.5, 83, matMadeira);
-    addBox(0.5, 3, 0.5, -3.5, -10.5, 87, matMadeira);
-    addBox(0.5, 3, 0.5, 3.5, -10.5, 87, matMadeira);
-
-    // Celular em cima da mesa
     const celular = addBox(0.4, 0.1, 0.8, 0, -8.7, 85, new THREE.MeshStandardMaterial({color: 0x111111}), false);
     luzCelular.position.set(0, -8.5, 85);
 
-    // Portas de baixo
-    const portaMetal = addBox(4, 8, 0.3, -8, -8, 70, new THREE.MeshStandardMaterial({color: 0x444444})); // Trancada
-    const portaSala = addBox(4, 8, 0.3, 8, -8, 70, matMadeira); // Aberta
+    addBox(4, 8, 0.3, -8, -8, 70, new THREE.MeshStandardMaterial({color: 0x444444})); 
+    addBox(4, 8, 0.3, 8, -8, 70, matMadeira); 
 
-    // --- LOGICA DE JOGO ---
+    // --- LOGICA ---
     window.irParaSelecao = () => {
         document.getElementById('menu-inicial').style.display = 'none';
         document.getElementById('selecao-dispositivo').style.display = 'flex';
@@ -146,44 +139,20 @@
         if(dispositivo === 'pc') document.addEventListener('click', () => controls.lock());
     }
 
-    function interagir() {
-        // Distância do Interruptor
-        if(camera.position.distanceTo(interruptor.position) < 5) {
-            luzLigada = !luzLigada;
-            luzQuarto.intensity = luzLigada ? 20 : 0;
-        }
-        // Distância do Celular
-        if(camera.position.distanceTo(celular.position) < 5) {
-            luzCelular.intensity = 5;
-            document.getElementById('instrucoes').innerText = "Você recebeu uma mensagem...";
-        }
-    }
-
     window.executarDescida = () => {
         document.getElementById('btn-descer').style.display = 'none';
         new TWEEN.Tween(camera.position).to({x: 0, y: -8, z: 75}, 3000)
             .easing(TWEEN.Easing.Quadratic.InOut)
             .onComplete(() => {
                 noAndarDeCima = false;
-                luzSala.intensity = 15;
-                document.getElementById('instrucoes').innerText = "Encontre o celular na mesa.";
+                document.getElementById('instrucoes').innerText = "Vá até a mesa.";
             }).start();
     };
 
-    // Teclado
     const keys = {};
-    document.addEventListener('keydown', (e) => {
-        keys[e.code] = true;
-        if(e.code === 'KeyE') interagir();
-    });
+    document.addEventListener('keydown', (e) => keys[e.code] = true);
     document.addEventListener('keyup', (e) => keys[e.code] = false);
 
-    // Mobile Interact
-    renderer.domElement.addEventListener('touchstart', (e) => {
-        if(e.target.id !== 'joystick-area') interagir();
-    });
-
-    // Mobile Joystick
     const area = document.getElementById('joystick-area');
     const stick = document.getElementById('joystick-stick');
     area.addEventListener('touchmove', (e) => {
@@ -202,7 +171,6 @@
     function animate() {
         requestAnimationFrame(animate);
         TWEEN.update();
-
         const speed = 0.08; 
         let prevPos = camera.position.clone();
 
@@ -217,19 +185,16 @@
                 camera.translateX(moveRight * speed);
             }
 
-            // Colisao
             colidiveis.forEach(obj => {
                 const box = new THREE.Box3().setFromObject(obj);
                 if(box.containsPoint(camera.position)) camera.position.copy(prevPos);
             });
 
-            // Head Bobbing
             if(camera.position.distanceTo(prevPos) > 0.01) {
                 walkTimer += 0.12;
                 camera.position.y = (noAndarDeCima ? 5 : -8) + Math.sin(walkTimer) * 0.1;
             }
 
-            // Ativar botão de descida no fim do corredor
             if(noAndarDeCima && camera.position.z > 50) {
                 document.getElementById('btn-descer').style.display = 'block';
             } else {
