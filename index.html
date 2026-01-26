@@ -1,183 +1,274 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Minecraft Mobile - Quebrar Blocos</title>
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <style>
-        /* UI de Jogo */
-        #game-ui { display: none; }
-        
-        /* MIRA CENTRAL (CROSSHAIR) */
-        #crosshair {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 20px;
-            height: 20px;
-            z-index: 100;
-            pointer-events: none;
-        }
-        #crosshair::before, #crosshair::after {
-            content: '';
-            position: absolute;
-            background: white;
-            box-shadow: 0 0 2px black;
-        }
-        #crosshair::before { top: 50%; left: 0; width: 100%; height: 2px; transform: translateY(-50%); }
-        #crosshair::after { left: 50%; top: 0; height: 100%; width: 2px; transform: translateX(-50%); }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Neon Odyssey</title>
 
-        /* BOTÃO DE INTERAÇÃO (QUEBRAR) */
-        .action-btn {
-            position: fixed;
-            bottom: 30px;
-            right: 20px;
-            width: 80px;
-            height: 80px;
-            background: rgba(255, 0, 0, 0.4);
-            border: 3px solid white;
-            border-radius: 50%;
-            color: white;
-            font-weight: bold;
-            z-index: 1000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            touch-action: none;
-        }
+<style>
+body {
+    margin: 0;
+    overflow: hidden;
+    background: black;
+    font-family: monospace;
+}
 
-        /* Estilos base (Menu, Joysticks, Hotbar mantidos) */
-        #menu-inicial { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #2c3e50; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 5000; gap: 20px; }
-        .menu-title { color: white; font-family: sans-serif; font-size: 30px; text-shadow: 2px 2px #000; }
-        .menu-btn { width: 200px; padding: 12px; background: #4a4a4a; border: 2px solid #000; color: #fff; font-weight: bold; text-align: center; }
-        .joystick-container { position: fixed; bottom: 30px; left: 20px; z-index: 999; display: grid; grid-template-columns: repeat(3, 60px); gap: 8px; }
-        button.move-btn { width: 60px; height: 60px; background: rgba(0,0,0,0.5); border: 2px solid #ccc; color: white; border-radius: 12px; }
-        .hotbar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; background: rgba(0, 0, 0, 0.5); padding: 5px; z-index: 1000; }
-        .slot { width: 40px; height: 40px; background: rgba(255, 255, 255, 0.1); border: 2px solid #555; display: flex; justify-content: center; align-items: center; color: white; }
-        .slot.active { border-color: #ffff00; }
-    </style>
+canvas {
+    display: block;
+}
+
+/* HUD */
+#hud {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    color: #00fff7;
+    font-size: 14px;
+    text-shadow: 0 0 5px #00fff7;
+}
+
+.bar {
+    width: 150px;
+    height: 10px;
+    background: #222;
+    margin-top: 5px;
+    border: 1px solid #00fff7;
+}
+
+.bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00ff99, #00fff7);
+}
+
+/* Dialog */
+#dialog-box {
+    position: absolute;
+    bottom: 20px;
+    left: 10%;
+    width: 80%;
+    background: rgba(0,0,0,0.85);
+    border: 2px solid #ff2e63;
+    color: white;
+    padding: 15px;
+    display: none;
+}
+
+button {
+    background: #ff2e63;
+    border: none;
+    padding: 10px;
+    color: white;
+    margin-top: 10px;
+}
+</style>
 </head>
+
 <body>
 
-    <div id="crosshair"></div>
+<div id="hud">
+    HP
+    <div class="bar"><div id="hpbar" class="bar-fill"></div></div>
+    XP
+    <div class="bar"><div id="xpbar" class="bar-fill"></div></div>
+    Moedas: <span id="coins">0</span><br>
+    Level: <span id="level">1</span>
+</div>
 
-    <div id="menu-inicial">
-        <div class="menu-title">MINECRAFT WEB</div>
-        <div class="menu-btn" onclick="startGame()">JOGAR</div>
-    </div>
+<div id="dialog-box">
+    <p id="dialog-text"></p>
+    <button onclick="closeDialog()">Fechar</button>
+    <button id="buyBtn" onclick="buyPotion()" style="display:none;">Comprar Poção (10)</button>
+</div>
 
-    <div id="game-ui">
-        <div class="action-btn" id="break-btn">QUEBRAR</div>
-        
-        <div class="hotbar"><div class="slot active">1</div><div class="slot">2</div><div class="slot">3</div></div>
-        
-        <div class="joystick-container">
-            <div style="grid-column: 2"><button class="move-btn" id="btnUp">W</button></div>
-            <button class="move-btn" id="btnLeft" style="grid-row: 2; grid-column: 1">A</button>
-            <button class="move-btn" id="btnDown" style="grid-row: 2; grid-column: 2">S</button>
-            <button class="move-btn" id="btnRight" style="grid-row: 2; grid-column: 3">D</button>
-        </div>
-    </div>
+<canvas id="game"></canvas>
 
-    <a-scene>
-        <a-assets>
-            <canvas id="tex-grama" width="64" height="64"></canvas>
-            <canvas id="tex-pedra" width="64" height="64"></canvas>
-        </a-assets>
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-        <a-sky color="#73C2FB"></a-sky>
+canvas.width = innerWidth;
+canvas.height = innerHeight;
 
-        <a-box class="interactable" position="0 -1 0" width="100" height="2" depth="100" 
-               material="src: #tex-grama; repeat: 100 2; roughness: 1"></a-box>
-        
-        <a-box class="interactable" position="0 -11 0" width="100" height="18" depth="100" 
-               material="src: #tex-pedra; repeat: 100 18; roughness: 1"></a-box>
+/* Estado */
+let gameActive = true;
+let particles = [];
 
-        <a-box class="interactable" position="2 0.5 -5" color="#567d46"></a-box>
-        <a-box class="interactable" position="-2 0.5 -3" color="#888888"></a-box>
+let player = {
+    x: 200,
+    y: 200,
+    size: 25,
+    hp: 100,
+    maxHp: 100,
+    xp: 0,
+    level: 1,
+    coins: 0,
+    speed: 3,
+    attackCooldown: 0
+};
 
-        <a-entity id="rig" position="0 0 0">
-            <a-entity id="camera" camera position="0 1.6 0" look-controls="enabled: false">
-                <a-entity id="raycaster" raycaster="objects: .interactable; far: 5"></a-entity>
-            </a-entity>
-        </a-entity>
+let joystick = {active:false,x:0,y:0,cx:0,cy:0};
 
-        <a-light type="ambient" color="#FFF"></a-light>
-    </a-scene>
+let entities = [];
 
-    <script>
-        // Gerar Texturas
-        function createTex(id, color) {
-            const ctx = document.getElementById(id).getContext('2d');
-            ctx.fillStyle = color; ctx.fillRect(0,0,64,64);
-            ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 4; ctx.strokeRect(0,0,64,64);
-        }
-        createTex('tex-grama', '#567d46'); createTex('tex-pedra', '#888888');
+/* Level */
+function init() {
+    entities = [
+        {type:'npc',x:300,y:200,text:'A cidade está viva...'},
+        {type:'shop',x:500,y:300,text:'Sobreviva melhor.'},
+        {type:'mob',x:400,y:400,hp:30},
+        {type:'mob',x:600,y:200,hp:30}
+    ];
+}
 
-        // Lógica de Quebrar
-        const raycaster = document.querySelector('#raycaster');
-        const breakBtn = document.querySelector('#break-btn');
+/* Partículas */
+function spawnParticle(x,y,color) {
+    particles.push({
+        x,y,
+        vx:(Math.random()-0.5)*2,
+        vy:(Math.random()-0.5)*2,
+        life:30,
+        color
+    });
+}
 
-        breakBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const intersection = raycaster.components.raycaster.getIntersection(document.querySelector('.interactable'));
-            
-            if (intersection) {
-                const target = intersection.object.el;
-                // Animação simples de "sumir" ao quebrar
-                target.setAttribute('visible', 'false');
-                // Remove do mundo
-                setTimeout(() => target.parentNode.removeChild(target), 100);
+/* Touch */
+canvas.addEventListener("touchstart",e=>{
+    joystick.active=true;
+    joystick.x=e.touches[0].clientX;
+    joystick.y=e.touches[0].clientY;
+});
+
+canvas.addEventListener("touchmove",e=>{
+    joystick.cx=e.touches[0].clientX;
+    joystick.cy=e.touches[0].clientY;
+});
+
+canvas.addEventListener("touchend",()=>joystick.active=false);
+
+/* Ataque */
+canvas.addEventListener("click", attack);
+
+function attack() {
+    if(player.attackCooldown>0) return;
+    player.attackCooldown=20;
+
+    entities.forEach(e=>{
+        if(e.type==="mob"){
+            let d=Math.hypot(player.x-e.x,player.y-e.y);
+            if(d<60){
+                e.hp-=20;
+                spawnParticle(e.x,e.y,"#ff004c");
             }
-        });
-
-        // Funções de Interface
-        function startGame() {
-            document.getElementById('menu-inicial').style.display = 'none';
-            document.getElementById('game-ui').style.display = 'block';
         }
+    });
+}
 
-        // --- SISTEMA DE MOVIMENTO E TOQUE (MANTIDO) ---
-        const rig = document.querySelector('#rig'), camera = document.querySelector('#camera');
-        let moveSpeed = 0.12, lookSens = 0.15, pitch = 0, yaw = 0;
-        const keys = { up: false, down: false, left: false, right: false };
-        let isTouching = false, lastX, lastY;
+/* Update */
+function update() {
+    if(!gameActive) return;
 
-        window.addEventListener('touchstart', e => { 
-            if(e.target.tagName !== 'BUTTON' && e.target.id !== 'break-btn'){ 
-                isTouching = true; lastX = e.touches[0].screenX; lastY = e.touches[0].screenY; 
-            }
-        });
-        window.addEventListener('touchmove', e => {
-            if(!isTouching) return;
-            yaw -= (e.touches[0].screenX - lastX) * lookSens;
-            pitch = Math.max(-80, Math.min(80, pitch - (e.touches[0].screenY - lastY) * lookSens));
-            lastX = e.touches[0].screenX; lastY = e.touches[0].screenY;
-            camera.setAttribute('rotation', `${pitch} ${yaw} 0`);
-        });
-        window.addEventListener('touchend', () => isTouching = false);
-
-        function bind(id, k) { 
-            document.getElementById(id).addEventListener('touchstart', e => {e.preventDefault(); keys[k] = true;});
-            document.getElementById(id).addEventListener('touchend', () => keys[k] = false);
+    if(joystick.active){
+        let dx=joystick.cx-joystick.x;
+        let dy=joystick.cy-joystick.y;
+        let d=Math.hypot(dx,dy);
+        if(d>10){
+            player.x+=(dx/d)*player.speed;
+            player.y+=(dy/d)*player.speed;
         }
-        bind('btnUp','up'); bind('btnDown','down'); bind('btnLeft','left'); bind('btnRight','right');
+    }
 
-        function update() {
-            if(keys.up || keys.down || keys.left || keys.right) {
-                let angle = yaw * (Math.PI / 180);
-                let pos = rig.getAttribute('position');
-                if(keys.up){ pos.x -= Math.sin(angle)*moveSpeed; pos.z -= Math.cos(angle)*moveSpeed; }
-                if(keys.down){ pos.x += Math.sin(angle)*moveSpeed; pos.z += Math.cos(angle)*moveSpeed; }
-                if(keys.left){ pos.x -= Math.cos(angle)*moveSpeed; pos.z += Math.sin(angle)*moveSpeed; }
-                if(keys.right){ pos.x += Math.cos(angle)*moveSpeed; pos.z -= Math.sin(angle)*moveSpeed; }
-                rig.setAttribute('position', pos);
-            }
-            requestAnimationFrame(update);
+    if(player.attackCooldown>0) player.attackCooldown--;
+
+    entities = entities.filter(e=>{
+        if(e.type==="mob" && e.hp<=0){
+            player.xp+=20;
+            player.coins+=5;
+            return false;
         }
+        return true;
+    });
+
+    if(player.xp>=100){
+        player.xp=0;
+        player.level++;
+        player.maxHp+=20;
+        player.hp=player.maxHp;
+    }
+
+    particles.forEach(p=>{
+        p.x+=p.vx;
+        p.y+=p.vy;
+        p.life--;
+    });
+
+    particles=particles.filter(p=>p.life>0);
+}
+
+/* Draw */
+function draw() {
+    ctx.fillStyle="#070720";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    /* Grade neon */
+    ctx.strokeStyle="rgba(0,255,255,0.05)";
+    for(let i=0;i<canvas.width;i+=50){
+        ctx.beginPath();
+        ctx.moveTo(i,0);
+        ctx.lineTo(i,canvas.height);
+        ctx.stroke();
+    }
+
+    entities.forEach(e=>{
+        ctx.fillStyle = e.type==="mob"?"#ff004c": e.type==="shop"?"#f5c542":"#00ff99";
+        ctx.beginPath();
+        ctx.arc(e.x,e.y,20,0,Math.PI*2);
+        ctx.fill();
+    });
+
+    particles.forEach(p=>{
+        ctx.fillStyle=p.color;
+        ctx.fillRect(p.x,p.y,3,3);
+    });
+
+    ctx.fillStyle="#00d9ff";
+    ctx.fillRect(player.x-12,player.y-12,25,25);
+
+    document.getElementById("hpbar").style.width =
+        (player.hp/player.maxHp*100)+"%";
+    document.getElementById("xpbar").style.width =
+        (player.xp/100*100)+"%";
+    document.getElementById("coins").innerText=player.coins;
+    document.getElementById("level").innerText=player.level;
+
+    requestAnimationFrame(()=>{
         update();
-    </script>
+        draw();
+    });
+}
+
+/* Diálogo */
+function showDialog(text,isShop=false){
+    gameActive=false;
+    document.getElementById("dialog-box").style.display="block";
+    document.getElementById("dialog-text").innerText=text;
+    document.getElementById("buyBtn").style.display=isShop?"block":"none";
+}
+
+function closeDialog(){
+    gameActive=true;
+    document.getElementById("dialog-box").style.display="none";
+}
+
+function buyPotion(){
+    if(player.coins>=10){
+        player.coins-=10;
+        player.hp=Math.min(player.maxHp,player.hp+40);
+    }
+}
+
+/* Start */
+init();
+draw();
+</script>
 </body>
-</html>
+    </html>
