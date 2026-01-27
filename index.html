@@ -1,209 +1,243 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FNAF: No Safe Place</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; touch-action: none; }
-        #menu-inicial, #selecao-dispositivo, #intro-text {
-            position: absolute; width: 100%; height: 100%;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 100; transition: opacity 0.8s; background: black;
-        }
-        h1 { color: #8b0000; font-size: 2rem; text-shadow: 0 0 10px #f00; text-align: center; }
-        button {
-            padding: 15px 30px; font-size: 1rem; background: transparent;
-            color: white; border: 1px solid #444; cursor: pointer;
-            transition: 0.3s; letter-spacing: 2px; margin: 10px; width: 250px;
-        }
-        button:hover { background: #8b0000; border-color: #f00; }
-        #fade-overlay { position: absolute; width: 100%; height: 100%; background: black; opacity: 0; pointer-events: none; z-index: 200; }
-        #instrucoes { position: absolute; bottom: 20px; width: 100%; text-align: center; color: rgba(255,255,255,0.6); font-size: 0.8rem; z-index: 150; pointer-events: none; }
-        #joystick-area { position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.05); border-radius: 50%; display: none; z-index: 150; border: 1px solid rgba(255,255,255,0.1); }
-        #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 50%; }
-        #btn-descer { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px; background: rgba(0,0,0,0.8); color: white; border: 1px solid #8b0000; display: none; z-index: 160; }
-    </style>
+<meta charset="UTF-8">
+<title>FNAF: No Safe Place</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Courier New', monospace;
+}
+
+body {
+    background: black;
+    color: white;
+    height: 100vh;
+    overflow: hidden;
+    transition: filter 0.3s;
+}
+
+/* ESTÁTICA */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: url("https://i.imgur.com/8KQkZgN.gif");
+    opacity: 0.06;
+    pointer-events: none;
+}
+
+/* MENU */
+.screen {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    text-align: center;
+    animation: fadeIn 2s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0 }
+    to { opacity: 1 }
+}
+
+/* TÍTULO */
+.title {
+    font-size: 2.4em;
+    letter-spacing: 3px;
+    margin-bottom: 10px;
+    animation: glitch 2.5s infinite;
+}
+
+@keyframes glitch {
+    0% { text-shadow: 2px 0 red; }
+    25% { text-shadow: -2px 0 cyan; }
+    50% { text-shadow: 2px 2px red; }
+    75% { text-shadow: -2px -2px cyan; }
+    100% { text-shadow: 2px 0 red; }
+}
+
+.subtitle {
+    opacity: 0.7;
+    margin-bottom: 30px;
+}
+
+/* BOTÕES */
+button {
+    background: none;
+    border: 1px solid white;
+    color: white;
+    padding: 12px 30px;
+    margin: 8px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+button:hover {
+    background: white;
+    color: black;
+}
+
+/* CONFIG */
+.settings {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.95);
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.setting {
+    margin: 10px;
+}
+
+/* INFO CONTROLES */
+.controlsInfo {
+    margin-top: 20px;
+    font-size: 0.85em;
+    opacity: 0.8;
+}
+
+/* FOOTER */
+.footer {
+    position: absolute;
+    bottom: 15px;
+    font-size: 0.7em;
+    opacity: 0.5;
+}
+</style>
 </head>
+
 <body>
 
-    <div id="fade-overlay"></div>
-    <div id="instrucoes">EXPLORE A CASA</div>
+<!-- MENU PRINCIPAL -->
+<div class="screen" id="menu">
+    <div class="title">FNAF: NO SAFE PLACE</div>
+    <div class="subtitle">There is no safe place.</div>
 
-    <div id="menu-inicial">
-        <h1>FNAF:<br>NO SAFE PLACE</h1>
-        <button onclick="irParaSelecao()">JOGAR</button>
+    <button onclick="startGame()">INICIAR</button>
+    <button onclick="openSettings()">CONFIGURAÇÕES</button>
+    <button onclick="credits()">CRÉDITOS</button>
+
+    <div class="footer">Fangame não oficial</div>
+</div>
+
+<!-- CONFIGURAÇÕES -->
+<div class="settings" id="settings">
+    <h3>CONFIGURAÇÕES</h3>
+
+    <div class="setting">
+        🔊 Volume:
+        <input type="range" id="volume" min="0" max="100">
     </div>
 
-    <div id="selecao-dispositivo" style="display: none;">
-        <h2 style="color: white;">DISPOSITIVO</h2>
-        <button onclick="configurarDispositivo('pc')">PC (WASD)</button>
-        <button onclick="configurarDispositivo('mobile')">CELULAR (TOUCH)</button>
+    <div class="setting">
+        🌑 Brilho:
+        <input type="range" id="brightness" min="50" max="150">
     </div>
 
-    <div id="intro-text" style="display:none; color:white; font-size:1.2rem; text-align: center;"></div>
-    
-    <div id="joystick-area"><div id="joystick-stick"></div></div>
-    <button id="btn-descer" onclick="executarDescida()">DESCER ESCADAS</button>
+    <div class="setting">
+        🎮 Plataforma:
+        <select id="platform">
+            <option value="mobile">Celular (Toque)</option>
+            <option value="pc">Computador (Mouse / Teclado)</option>
+        </select>
+    </div>
 
-<script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-            "tween": "https://cdnjs.cloudflare.com/ajax/libs/tween.js/23.1.1/tween.esm.js"
-        }
+    <div class="controlsInfo" id="controlsInfo"></div>
+
+    <button onclick="closeSettings()">VOLTAR</button>
+</div>
+
+<!-- SOM -->
+<audio id="ambience" loop>
+    <source src="https://cdn.pixabay.com/audio/2022/03/15/audio_9b88c9f6b1.mp3">
+</audio>
+
+<script>
+const ambience = document.getElementById("ambience");
+const volumeSlider = document.getElementById("volume");
+const brightnessSlider = document.getElementById("brightness");
+const platformSelect = document.getElementById("platform");
+const controlsInfo = document.getElementById("controlsInfo");
+
+/* CONTROLES INFO */
+function updateControlsInfo(mode) {
+    if (mode === "mobile") {
+        controlsInfo.innerHTML =
+        "📱 CONTROLES MOBILE:<br>• Toque para abrir tablet<br>• Botões na tela<br>• Arrastar para olhar";
+        document.body.style.touchAction = "none";
+    } else {
+        controlsInfo.innerHTML =
+        "🖥️ CONTROLES PC:<br>• Mouse para olhar<br>• Clique para ações<br>• Teclas para atalhos";
+        document.body.style.touchAction = "auto";
     }
+}
+
+/* CARREGAR CONFIG */
+function loadSettings() {
+    const volume = localStorage.getItem("volume") ?? 50;
+    const brightness = localStorage.getItem("brightness") ?? 100;
+    const platform = localStorage.getItem("platform") ?? "mobile";
+
+    volumeSlider.value = volume;
+    brightnessSlider.value = brightness;
+    platformSelect.value = platform;
+
+    ambience.volume = volume / 100;
+    document.body.style.filter = `brightness(${brightness}%)`;
+    updateControlsInfo(platform);
+}
+
+loadSettings();
+
+/* SALVAR CONFIG */
+volumeSlider.addEventListener("input", () => {
+    localStorage.setItem("volume", volumeSlider.value);
+    ambience.volume = volumeSlider.value / 100;
+});
+
+brightnessSlider.addEventListener("input", () => {
+    localStorage.setItem("brightness", brightnessSlider.value);
+    document.body.style.filter = `brightness(${brightnessSlider.value}%)`;
+});
+
+platformSelect.addEventListener("change", () => {
+    localStorage.setItem("platform", platformSelect.value);
+    updateControlsInfo(platformSelect.value);
+});
+
+/* MENU */
+ambience.play().catch(()=>{});
+
+function openSettings() {
+    menu.style.display = "none";
+    settings.style.display = "flex";
+}
+
+function closeSettings() {
+    settings.style.display = "none";
+    menu.style.display = "flex";
+}
+
+function startGame() {
+    alert("Noite 1 iniciando...\nModo: " + platformSelect.value.toUpperCase());
+    // window.location.href = "game.html";
+}
+
+function credits() {
+    alert("Criado por Slazeer\nFNAF: No Safe Place");
+}
 </script>
 
-<script type="module">
-    import * as THREE from 'three';
-    import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-    import TWEEN from 'tween';
-
-    let dispositivo = 'pc';
-    let moveForward = 0, moveRight = 0;
-    let noAndarDeCima = true;
-    let walkTimer = 0;
-    const colidiveis = [];
-
-    // --- SETUP ---
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    const controls = new PointerLockControls(camera, document.body);
-
-    // --- LUZES (Sempre Ligadas) ---
-    const luzQuarto = new THREE.PointLight(0xfff5e1, 20, 40);
-    luzQuarto.position.set(0, 10, 0);
-    scene.add(luzQuarto);
-
-    const luzCorredor = new THREE.PointLight(0xfff5e1, 15, 50);
-    luzCorredor.position.set(0, 10, 30);
-    scene.add(luzCorredor);
-
-    const luzSala = new THREE.PointLight(0xffaa44, 15, 60);
-    luzSala.position.set(0, -5, 80);
-    scene.add(luzSala);
-
-    const luzCelular = new THREE.PointLight(0x00aaff, 2, 5); 
-    scene.add(luzCelular);
-
-    // --- CONSTRUÇÃO ---
-    const matParede = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
-    const matChao = new THREE.MeshStandardMaterial({ color: 0x050505 });
-    const matMadeira = new THREE.MeshStandardMaterial({ color: 0x3d2b1f });
-
-    function addBox(w, h, d, x, y, z, mat, colide = true) {
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-        mesh.position.set(x, y, z);
-        scene.add(mesh);
-        if(colide) colidiveis.push(mesh);
-        return mesh;
-    }
-
-    // Estrutura
-    addBox(22, 12, 1, 0, 6, -11, matParede); 
-    addBox(1, 12, 100, -11, 6, 40, matParede); 
-    addBox(1, 12, 100, 11, 6, 40, matParede);  
-    addBox(200, 1, 200, 0, -0.5, 0, matChao, false); 
-
-    const cama = addBox(6, 2, 10, -6, 1, 4, matMadeira);
-
-    // ANDAR DE BAIXO
-    const tampoMesa = addBox(8, 0.5, 5, 0, -9, 85, matMadeira);
-    const celular = addBox(0.4, 0.1, 0.8, 0, -8.7, 85, new THREE.MeshStandardMaterial({color: 0x111111}), false);
-    luzCelular.position.set(0, -8.5, 85);
-
-    addBox(4, 8, 0.3, -8, -8, 70, new THREE.MeshStandardMaterial({color: 0x444444})); 
-    addBox(4, 8, 0.3, 8, -8, 70, matMadeira); 
-
-    // --- LOGICA ---
-    window.irParaSelecao = () => {
-        document.getElementById('menu-inicial').style.display = 'none';
-        document.getElementById('selecao-dispositivo').style.display = 'flex';
-    };
-
-    window.configurarDispositivo = (tipo) => {
-        dispositivo = tipo;
-        document.getElementById('selecao-dispositivo').style.display = 'none';
-        if(dispositivo === 'mobile') document.getElementById('joystick-area').style.display = 'block';
-        despertar();
-    };
-
-    function despertar() {
-        camera.position.set(-6, 5, 4);
-        if(dispositivo === 'pc') document.addEventListener('click', () => controls.lock());
-    }
-
-    window.executarDescida = () => {
-        document.getElementById('btn-descer').style.display = 'none';
-        new TWEEN.Tween(camera.position).to({x: 0, y: -8, z: 75}, 3000)
-            .easing(TWEEN.Easing.Quadratic.InOut)
-            .onComplete(() => {
-                noAndarDeCima = false;
-                document.getElementById('instrucoes').innerText = "Vá até a mesa.";
-            }).start();
-    };
-
-    const keys = {};
-    document.addEventListener('keydown', (e) => keys[e.code] = true);
-    document.addEventListener('keyup', (e) => keys[e.code] = false);
-
-    const area = document.getElementById('joystick-area');
-    const stick = document.getElementById('joystick-stick');
-    area.addEventListener('touchmove', (e) => {
-        const touch = e.touches[0];
-        const rect = area.getBoundingClientRect();
-        const x = touch.clientX - rect.left - 60;
-        const y = touch.clientY - rect.top - 60;
-        const dist = Math.min(Math.sqrt(x*x+y*y), 40);
-        const angle = Math.atan2(y, x);
-        stick.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
-        moveForward = -Math.sin(angle) * (dist/40);
-        moveRight = Math.cos(angle) * (dist/40);
-    });
-    area.addEventListener('touchend', () => { moveForward = 0; moveRight = 0; stick.style.transform = 'translate(0,0)'; });
-
-    function animate() {
-        requestAnimationFrame(animate);
-        TWEEN.update();
-        const speed = 0.08; 
-        let prevPos = camera.position.clone();
-
-        if(controls.isLocked || dispositivo === 'mobile') {
-            if(dispositivo === 'pc') {
-                if(keys['KeyW']) controls.moveForward(speed);
-                if(keys['KeyS']) controls.moveForward(-speed);
-                if(keys['KeyA']) controls.moveRight(-speed);
-                if(keys['KeyD']) controls.moveRight(speed);
-            } else {
-                camera.translateZ(-moveForward * speed);
-                camera.translateX(moveRight * speed);
-            }
-
-            colidiveis.forEach(obj => {
-                const box = new THREE.Box3().setFromObject(obj);
-                if(box.containsPoint(camera.position)) camera.position.copy(prevPos);
-            });
-
-            if(camera.position.distanceTo(prevPos) > 0.01) {
-                walkTimer += 0.12;
-                camera.position.y = (noAndarDeCima ? 5 : -8) + Math.sin(walkTimer) * 0.1;
-            }
-
-            if(noAndarDeCima && camera.position.z > 50) {
-                document.getElementById('btn-descer').style.display = 'block';
-            } else {
-                document.getElementById('btn-descer').style.display = 'none';
-            }
-        }
-        renderer.render(scene, camera);
-    }
-    animate();
-</script>
 </body>
 </html>
