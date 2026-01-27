@@ -31,20 +31,18 @@ body::before {
     pointer-events: none;
 }
 
-/* MENU */
-.screen {
-    display: flex;
+/* TELAS */
+.screen, .settings, .tutorial {
+    display: none;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     height: 100%;
     text-align: center;
-    animation: fadeIn 2s;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0 }
-    to { opacity: 1 }
+.screen {
+    display: flex;
 }
 
 /* TÍTULO */
@@ -86,25 +84,14 @@ button:hover {
 }
 
 /* CONFIG */
-.settings {
+.settings, .tutorial {
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,0.95);
-    display: none;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
 }
 
 .setting {
     margin: 10px;
-}
-
-/* INFO CONTROLES */
-.controlsInfo {
-    margin-top: 20px;
-    font-size: 0.85em;
-    opacity: 0.8;
 }
 
 /* FOOTER */
@@ -119,12 +106,12 @@ button:hover {
 
 <body>
 
-<!-- MENU PRINCIPAL -->
+<!-- MENU -->
 <div class="screen" id="menu">
     <div class="title">FNAF: NO SAFE PLACE</div>
     <div class="subtitle">There is no safe place.</div>
 
-    <button onclick="startGame()">INICIAR</button>
+    <button onclick="openTutorial()">JOGAR</button>
     <button onclick="openSettings()">CONFIGURAÇÕES</button>
     <button onclick="credits()">CRÉDITOS</button>
 
@@ -148,14 +135,28 @@ button:hover {
     <div class="setting">
         🎮 Plataforma:
         <select id="platform">
-            <option value="mobile">Celular (Toque)</option>
-            <option value="pc">Computador (Mouse / Teclado)</option>
+            <option value="mobile">Celular</option>
+            <option value="pc">Computador</option>
         </select>
     </div>
 
-    <div class="controlsInfo" id="controlsInfo"></div>
-
     <button onclick="closeSettings()">VOLTAR</button>
+</div>
+
+<!-- MINI TUTORIAL -->
+<div class="tutorial" id="tutorial">
+    <h3>ANTES DE COMEÇAR</h3>
+    <p style="max-width: 320px; opacity:0.8; margin:15px;">
+        • Use o tablet para ver câmeras<br>
+        • Gerencie energia com cuidado<br>
+        • Alguns animatrônicos reagem ao SOM<br>
+        • Não existe lugar seguro
+    </p>
+
+    <button onclick="startGame(false)">ENTRAR SEM MICROFONE 🚫</button>
+    <button onclick="startGame(true)">ENTRAR COM MICROFONE 🎤</button>
+
+    <button onclick="backToMenu()">VOLTAR</button>
 </div>
 
 <!-- SOM -->
@@ -168,20 +169,8 @@ const ambience = document.getElementById("ambience");
 const volumeSlider = document.getElementById("volume");
 const brightnessSlider = document.getElementById("brightness");
 const platformSelect = document.getElementById("platform");
-const controlsInfo = document.getElementById("controlsInfo");
 
-/* CONTROLES INFO */
-function updateControlsInfo(mode) {
-    if (mode === "mobile") {
-        controlsInfo.innerHTML =
-        "📱 CONTROLES MOBILE:<br>• Toque para abrir tablet<br>• Botões na tela<br>• Arrastar para olhar";
-        document.body.style.touchAction = "none";
-    } else {
-        controlsInfo.innerHTML =
-        "🖥️ CONTROLES PC:<br>• Mouse para olhar<br>• Clique para ações<br>• Teclas para atalhos";
-        document.body.style.touchAction = "auto";
-    }
-}
+let micEnabled = false;
 
 /* CARREGAR CONFIG */
 function loadSettings() {
@@ -195,26 +184,35 @@ function loadSettings() {
 
     ambience.volume = volume / 100;
     document.body.style.filter = `brightness(${brightness}%)`;
-    updateControlsInfo(platform);
 }
-
 loadSettings();
 
-/* SALVAR CONFIG */
-volumeSlider.addEventListener("input", () => {
+/* SALVAR */
+volumeSlider.oninput = () => {
     localStorage.setItem("volume", volumeSlider.value);
     ambience.volume = volumeSlider.value / 100;
-});
+};
 
-brightnessSlider.addEventListener("input", () => {
+brightnessSlider.oninput = () => {
     localStorage.setItem("brightness", brightnessSlider.value);
     document.body.style.filter = `brightness(${brightnessSlider.value}%)`;
-});
+};
 
-platformSelect.addEventListener("change", () => {
+platformSelect.onchange = () => {
     localStorage.setItem("platform", platformSelect.value);
-    updateControlsInfo(platformSelect.value);
-});
+};
+
+/* MICROFONE */
+async function enableMicrophone() {
+    try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        micEnabled = true;
+        localStorage.setItem("microphone", "true");
+    } catch {
+        alert("Microfone negado.");
+        micEnabled = false;
+    }
+}
 
 /* MENU */
 ambience.play().catch(()=>{});
@@ -229,8 +227,20 @@ function closeSettings() {
     menu.style.display = "flex";
 }
 
-function startGame() {
-    alert("Noite 1 iniciando...\nModo: " + platformSelect.value.toUpperCase());
+function openTutorial() {
+    menu.style.display = "none";
+    tutorial.style.display = "flex";
+}
+
+function backToMenu() {
+    tutorial.style.display = "none";
+    menu.style.display = "flex";
+}
+
+async function startGame(useMic) {
+    if (useMic) await enableMicrophone();
+    localStorage.setItem("microphone", useMic);
+    alert("Noite 1 iniciando...\nMicrofone: " + (useMic ? "ATIVO" : "DESATIVADO"));
     // window.location.href = "game.html";
 }
 
@@ -240,4 +250,4 @@ function credits() {
 </script>
 
 </body>
-</html>
+    </html>
