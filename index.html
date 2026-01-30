@@ -3,84 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meu Jogo 3D - Floresta</title>
+    <title>FNAF: Michael's Three Nights</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        body { margin: 0; overflow: hidden; font-family: 'Press Start 2P', cursive, monospace; background-color: #000; }
         canvas { display: block; }
 
-        /* Estilo dos Botões de Movimento */
-        #controls {
+        /* Painel de Objetivos */
+        #objective-panel {
             position: absolute;
-            bottom: 20px;
+            top: 20px;
             left: 20px;
-            display: grid;
-            grid-template-columns: repeat(3, 60px);
-            grid-gap: 10px;
-            z-index: 10;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #FF0000;
+            color: #FF0000;
+            font-size: 10px;
+            z-index: 20;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
         }
-        .btn {
-            width: 60px; height: 60px;
-            background: rgba(255, 255, 255, 0.3);
-            border: 2px solid white;
-            border-radius: 10px;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            user-select: none;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 1.2em;
-        }
-        .btn:active { background: rgba(255, 255, 255, 0.6); }
-        #up { grid-column: 2; }
-        #left { grid-column: 1; }
-        #down { grid-column: 2; }
-        #right { grid-column: 3; }
-        
-        #instructions {
+        #objective-text { color: #fff; margin-top: 10px; display: block; }
+
+        /* Mira (Crosshair) */
+        #crosshair {
             position: absolute;
-            top: 10px;
-            width: 100%;
-            text-align: center;
-            color: white;
-            z-index: 100;
+            top: 50%; left: 50%;
+            width: 4px; height: 4px;
+            background: white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 15;
         }
 
+        /* Botões */
+        #controls {
+            position: absolute; bottom: 20px; left: 20px;
+            display: grid; grid-template-columns: repeat(3, 60px); grid-gap: 10px; z-index: 10;
+        }
+        .btn {
+            width: 60px; height: 60px; background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #888; border-radius: 10px; color: #ccc;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #up { grid-column: 2; } #left { grid-column: 1; } #down { grid-column: 2; } #right { grid-column: 3; }
+        
         #blocker {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
+            position: absolute; width: 100%; height: 100%; background-color: #000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000;
         }
-        #instructions-text {
-            color: white;
-            font-size: 2em;
-            text-align: center;
-        }
-        #start-button {
-            padding: 20px 40px;
-            font-size: 1.5em;
-            cursor: pointer;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 10px;
-        }
+        #start-button { padding: 20px 40px; font-size: 1.2em; cursor: pointer; background: #1a1a1a; color: #00FF00; border: 2px solid #00FF00; }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
 
+    <div id="objective-panel">
+        OBJETIVO ATUAL:
+        <span id="objective-text">Pegue a chave</span>
+    </div>
+
+    <div id="crosshair"></div>
+
     <div id="blocker">
-        <div id="instructions-text">
-            <p>Clique ou toque para jogar</p>
-            <p>(Use WASD ou Setas para mover, mouse/arrastar para olhar)</p>
-            <button id="start-button">Iniciar</button>
-        </div>
+        <h1 style="color:red; margin-bottom: 20px;">FNAF: Michael's Three Nights</h1>
+        <button id="start-button">INICIAR NOITE</button>
     </div>
     
     <div id="controls">
@@ -103,303 +89,115 @@
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
-        // --- Configuração Básica ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb); // Céu azul
-
+        scene.background = new THREE.Color(0x010103);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // --- Luz ---
-        const ambientLight = new THREE.AmbientLight(0xcccccc, 0.6); // Luz ambiente
-        scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8); // Luz direcional (sol)
-        directionalLight.position.set(50, 200, 100);
-        directionalLight.castShadow = true;
-        scene.add(directionalLight);
+        const flashlight = new THREE.SpotLight(0xffffff, 20, 30, Math.PI/6, 0.5);
+        camera.add(flashlight);
+        camera.add(flashlight.target);
+        flashlight.target.position.set(0, 0, -1);
+        scene.add(camera);
 
-        renderer.shadowMap.enabled = true; // Habilita sombras
-        directionalLight.shadow.mapSize.width = 1024;
-        directionalLight.shadow.mapSize.height = 1024;
-        directionalLight.shadow.camera.near = 0.5;
-        directionalLight.shadow.camera.far = 500;
-        directionalLight.shadow.camera.left = -100;
-        directionalLight.shadow.camera.right = 100;
-        directionalLight.shadow.camera.top = 100;
-        directionalLight.shadow.camera.bottom = -100;
-
-
-        // --- Terreno com Relevo (HeightMap) ---
-        const terrainSize = 256; // Tamanho do terreno (nxn) - Aumentado para mais espaço
-        const terrainScale = 1; // Escala visual do terreno
-        const maxHeight = 20; // Altura máxima do relevo
-        const textureLoader = new THREE.TextureLoader();
-
-        // Função para gerar um HeightMap mais interessante (ruído Perlin simulado)
-        function generateHeightMap(width, height) {
-            const data = new Float32Array(width * height);
-            for (let x = 0; x < width; x++) {
-                for (let y = 0; y < height; y++) {
-                    const i = x + y * width;
-                    // Combinação de ruídos para terreno mais natural
-                    let val = 0;
-                    val += Math.sin(x * 0.05) * 0.5 + Math.cos(y * 0.03) * 0.4;
-                    val += Math.sin(x * 0.1) * 0.2 + Math.cos(y * 0.07) * 0.1;
-                    val += Math.random() * 0.1; // Pequeno ruído aleatório
-                    data[i] = Math.max(0, val) * 0.5 + 0.5; // Normaliza e garante positivos
-                }
-            }
-            return data;
-        }
-
-        const heightMap = generateHeightMap(terrainSize, terrainSize);
-
-        const terrainGeometry = new THREE.PlaneGeometry(terrainSize * terrainScale, terrainSize * terrainScale, terrainSize - 1, terrainSize - 1);
-        terrainGeometry.rotateX(-Math.PI / 2); // Deita o plano
-
-        const vertices = terrainGeometry.attributes.position.array;
-        for (let i = 0, j = 0; i < vertices.length; i += 3, j++) {
-            vertices[i + 1] = heightMap[j] * maxHeight;
-        }
-        terrainGeometry.computeVertexNormals();
-
-        const terrainMaterial = new THREE.MeshPhongMaterial({
-            color: 0x4F7942, // Verde floresta
-        });
-        textureLoader.load('https://cdn.rawgit.com/mrdoob/three.js/r129/examples/textures/grasslight-big.jpg', (texture) => {
-            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-            texture.repeat.set(terrainSize / 10, terrainSize / 10);
-            terrainMaterial.map = texture;
-            terrainMaterial.needsUpdate = true;
-        });
-
-        const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
-        terrain.receiveShadow = true; // Terreno recebe sombras
+        const terrain = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshPhongMaterial({ color: 0x0a0a0a }));
+        terrain.rotation.x = -Math.PI / 2;
         scene.add(terrain);
 
-        // Função para obter a altura do terreno em uma dada posição (x, z)
-        function getTerrainHeight(x, z) {
-            const worldX = x + (terrainSize * terrainScale) / 2;
-            const worldZ = z + (terrainSize * terrainScale) / 2;
+        // --- SISTEMA DE OBJETIVOS ---
+        let currentObjective = 1;
+        const objectiveLabel = document.getElementById('objective-text');
 
-            const gridX = Math.floor(worldX / terrainScale);
-            const gridZ = Math.floor(worldZ / terrainScale);
-
-            if (gridX < 0 || gridX >= terrainSize - 1 || gridZ < 0 || gridZ >= terrainSize - 1) {
-                return 0; // Fora dos limites, ou retorne uma altura padrão
-            }
-
-            const index = gridX + gridZ * terrainSize;
-            return heightMap[index] * maxHeight;
-        }
-
-
-        // --- Gerar Floresta e Mato ---
-        const numTrees = 500; // Quantidade de árvores
-        const numBushes = 1000; // Quantidade de matos
-
-        // Texturas para árvores e matos
-        const treeTrunkTexture = textureLoader.load('https://cdn.rawgit.com/mrdoob/three.js/r129/examples/textures/wood.jpg');
-        treeTrunkTexture.wrapS = treeTrunkTexture.wrapT = THREE.RepeatWrapping;
-        treeTrunkTexture.repeat.set(1, 2);
-
-        const treeLeafTexture = textureLoader.load('https://cdn.rawgit.com/mrdoob/three.js/r129/examples/textures/tree.png');
-        treeLeafTexture.colorSpace = THREE.SRGBColorSpace;
+        // --- OBJETOS ---
+        // 1. Casa 1 (Onde está a chave)
+        const house1 = new THREE.Group();
+        house1.add(new THREE.Mesh(new THREE.BoxGeometry(6, 4, 6), new THREE.MeshPhongMaterial({ color: 0x2b1d12 })));
+        const mesa = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 1), new THREE.MeshPhongMaterial({ color: 0x1a0f0a }));
+        mesa.position.set(0, 0.8, 0);
+        house1.add(mesa);
         
-        const bushTexture = textureLoader.load('https://cdn.rawgit.com/mrdoob/three.js/r129/examples/textures/grasslight-big.jpg');
-        bushTexture.colorSpace = THREE.SRGBColorSpace;
+        // Chave Realista
+        const chave = new THREE.Group();
+        const kPart = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3), new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 1 }));
+        kPart.rotation.z = Math.PI/2;
+        chave.add(kPart);
+        chave.name = "CHAVE"; // Nome para detecção
+        chave.position.set(0, 0.9, 0);
+        house1.add(chave);
+        house1.position.set(10, 0, 10);
+        scene.add(house1);
 
+        // 2. Casa dos Fundos (Onde está a bicicleta)
+        const house2 = new THREE.Group();
+        const walls2 = new THREE.Mesh(new THREE.BoxGeometry(6, 4, 6), new THREE.MeshPhongMaterial({ color: 0x1a1a1a }));
+        house2.add(walls2);
+        
+        // Bicicleta (Geometria simples: 2 rodas e um quadro)
+        const bike = new THREE.Group();
+        const rodaGeo = new THREE.TorusGeometry(0.4, 0.05, 8, 16);
+        const rodaMat = new THREE.MeshBasicMaterial({color: 0x111111});
+        const r1 = new THREE.Mesh(rodaGeo, rodaMat); r1.position.x = -0.6;
+        const r2 = new THREE.Mesh(rodaGeo, rodaMat); r2.position.x = 0.6;
+        const quadro = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.1), new THREE.MeshBasicMaterial({color: 0x880000}));
+        quadro.position.y = 0.4;
+        bike.add(r1, r2, quadro);
+        bike.name = "BICICLETA";
+        bike.position.set(0, 0.4, 0);
+        house2.add(bike);
+        house2.position.set(-15, 0, -20);
+        scene.add(house2);
 
-        for (let i = 0; i < numTrees; i++) {
-            const trunkHeight = Math.random() * 3 + 2; // Altura do tronco entre 2 e 5
-            const trunkRadius = Math.random() * 0.2 + 0.1; // Raio do tronco entre 0.1 e 0.3
-            
-            const treeTrunkGeo = new THREE.CylinderGeometry(trunkRadius, trunkRadius, trunkHeight, 8);
-            const treeTrunkMat = new THREE.MeshPhongMaterial({ map: treeTrunkTexture, color: 0x8B4513 });
-            const trunk = new THREE.Mesh(treeTrunkGeo, treeTrunkMat);
-            trunk.castShadow = true;
-            trunk.receiveShadow = true;
+        // --- DETECÇÃO ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2(0, 0); // Centro da tela
 
-            const coneHeight = Math.random() * 4 + 3; // Altura da copa entre 3 e 7
-            const coneRadius = Math.random() * 2 + 1; // Raio da copa entre 1 e 3
-            const treeLeafGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 16);
-            const treeLeafMat = new THREE.MeshPhongMaterial({ map: treeLeafTexture, color: 0x228B22 });
-            const leaves = new THREE.Mesh(treeLeafGeo, treeLeafMat);
-            leaves.castShadow = true;
-            leaves.receiveShadow = true;
+        function checkInteractions() {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
 
-
-            const tree = new THREE.Group();
-            tree.add(trunk);
-            tree.add(leaves);
-
-            // Posição aleatória
-            const x = (Math.random() - 0.5) * terrainSize * terrainScale * 0.9;
-            const z = (Math.random() - 0.5) * terrainSize * terrainScale * 0.9;
-            const y = getTerrainHeight(x, z);
-
-            trunk.position.y = trunkHeight / 2;
-            leaves.position.y = trunkHeight + coneHeight / 2 - 0.5; // Ajuste para sobrepor um pouco
-
-            tree.position.set(x, y, z);
-            scene.add(tree);
+            if (intersects.length > 0) {
+                const obj = intersects[0].object.parent; // Pegamos o grupo (Chave ou Bike)
+                
+                if (currentObjective === 1 && obj && obj.name === "CHAVE" && intersects[0].distance < 3) {
+                    scene.remove(chave);
+                    currentObjective = 2;
+                    objectiveLabel.innerText = "Abra a cabana dos fundos e pegue a Bicicleta";
+                    objectiveLabel.style.color = "#00FF00";
+                }
+                
+                if (currentObjective === 2 && obj && obj.name === "BICICLETA" && intersects[0].distance < 3) {
+                    scene.remove(bike);
+                    objectiveLabel.innerText = "VOCÊ SOBREVIVEU À PRIMEIRA NOITE";
+                    objectiveLabel.style.color = "#00FFFF";
+                }
+            }
         }
 
-        for (let i = 0; i < numBushes; i++) {
-            const bushSize = Math.random() * 0.8 + 0.4; // Tamanho do mato entre 0.4 e 1.2
-            const bushGeo = new THREE.BoxGeometry(bushSize, bushSize * 0.7, bushSize);
-            const bushMat = new THREE.MeshPhongMaterial({ map: bushTexture, color: 0x32CD32 });
-            const bush = new THREE.Mesh(bushGeo, bushMat);
-            bush.castShadow = true;
-            bush.receiveShadow = true;
-
-            const x = (Math.random() - 0.5) * terrainSize * terrainScale * 0.9;
-            const z = (Math.random() - 0.5) * terrainSize * terrainScale * 0.9;
-            const y = getTerrainHeight(x, z);
-
-            bush.position.set(x, y + bushSize * 0.35, z); // Ajusta para ficar no chão
-            scene.add(bush);
-        }
-
-        // --- Controles de Primeira Pessoa (PointerLockControls) ---
+        // --- CONTROLES E LOOP ---
         const controls = new PointerLockControls(camera, document.body);
+        document.getElementById('start-button').onclick = () => controls.lock();
+        controls.addEventListener('lock', () => document.getElementById('blocker').style.display = 'none');
+        controls.addEventListener('unlock', () => document.getElementById('blocker').style.display = 'flex');
 
-        const blocker = document.getElementById('blocker');
-        const startButton = document.getElementById('start-button');
+        const keys = { w: false, a: false, s: false, d: false };
+        window.onkeydown = (e) => keys[e.key.toLowerCase()] = true;
+        window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
 
-        startButton.addEventListener('click', () => {
-            controls.lock();
-        });
+        camera.position.set(0, 1.6, 0);
 
-        controls.addEventListener('lock', () => {
-            blocker.style.display = 'none';
-        });
-
-        controls.addEventListener('unlock', () => {
-            blocker.style.display = 'flex';
-        });
-
-        // --- Lógica de Movimento ---
-        const moveSpeed = 0.1;
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
-        let isGrounded = false; // Indica se o jogador está no chão
-
-        const keys = { w: false, a: false, s: false, d: false, space: false }; // Adicionado espaço para pular
-
-        window.addEventListener('keydown', (event) => {
-            if (controls.isLocked) {
-                switch (event.key.toLowerCase()) {
-                    case 'w': keys.w = true; break;
-                    case 'a': keys.a = true; break;
-                    case 's': keys.s = true; break;
-                    case 'd': keys.d = true; break;
-                    case ' ': keys.space = true; break; // Pular
-                }
-            }
-        });
-
-        window.addEventListener('keyup', (event) => {
-            if (controls.isLocked) {
-                switch (event.key.toLowerCase()) {
-                    case 'w': keys.w = false; break;
-                    case 'a': keys.a = false; break;
-                    case 's': keys.s = false; break;
-                    case 'd': keys.d = false; break;
-                    case ' ': keys.space = false; break;
-                }
-            }
-        });
-
-        // Listeners dos Botões na Tela
-        const setupBtn = (id, key) => {
-            const btn = document.getElementById(id);
-            btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
-            btn.addEventListener('touchend', () => keys[key] = false);
-            btn.addEventListener('mousedown', () => keys[key] = true);
-            btn.addEventListener('mouseup', () => keys[key] = false);
-        };
-
-        setupBtn('up', 'w');
-        setupBtn('left', 'a');
-        setupBtn('down', 's');
-        setupBtn('right', 'd');
-        // Você pode adicionar um botão de pulo se quiser:
-        // const jumpButton = document.createElement('div');
-        // jumpButton.id = 'jump';
-        // jumpButton.className = 'btn';
-        // jumpButton.textContent = 'Pulo';
-        // document.getElementById('controls').appendChild(jumpButton);
-        // setupBtn('jump', 'space');
-
-
-        // Posição inicial da câmera
-        camera.position.set(0, maxHeight + 5, 0);
-
-        // --- Loop de Animação ---
         function animate() {
             requestAnimationFrame(animate);
-
-            const prevCameraY = camera.position.y;
-
             if (controls.isLocked) {
-                const delta = 0.016;
-
-                velocity.x -= velocity.x * 10.0 * delta;
-                velocity.z -= velocity.z * 10.0 * delta;
-                velocity.y -= 9.8 * 10.0 * delta; // Gravidade
-
-                direction.z = Number(keys.w) - Number(keys.s);
-                direction.x = Number(keys.d) - Number(keys.a);
-                direction.normalize();
-
-                if (keys.w || keys.s) velocity.z -= direction.z * moveSpeed * 100.0 * delta;
-                if (keys.a || keys.d) velocity.x -= direction.x * moveSpeed * 100.0 * delta;
-
-                if (isGrounded && keys.space) {
-                    velocity.y = 10; // Força do pulo
-                    isGrounded = false;
-                }
-
-                controls.moveRight(-velocity.x * delta);
-                controls.moveForward(-velocity.z * delta);
-
-                camera.position.y += velocity.y * delta;
-
-                // Colisão com o terreno - RAYCASTING para seguir o relevo
-                const playerHeight = 1.8; // Altura do jogador
-                const raycaster = new THREE.Raycaster();
-                const down = new THREE.Vector3(0, -1, 0);
-                raycaster.set(camera.position, down);
-                const intersects = raycaster.intersectObject(terrain);
-
-                if (intersects.length > 0) {
-                    const groundHeight = intersects[0].point.y;
-                    if (camera.position.y < groundHeight + playerHeight) {
-                        camera.position.y = groundHeight + playerHeight;
-                        velocity.y = 0;
-                        isGrounded = true;
-                    }
-                } else {
-                    // Se o raycaster não acertar o terreno, significa que o jogador está fora dos limites
-                    // Ou o terreno não foi encontrado abaixo. Tratar como caindo no vazio.
-                    isGrounded = false;
-                }
-
+                if (keys.w) controls.moveForward(0.1);
+                if (keys.s) controls.moveForward(-0.1);
+                if (keys.a) controls.moveRight(-0.1);
+                if (keys.d) controls.moveRight(0.1);
+                checkInteractions();
             }
-
             renderer.render(scene, camera);
         }
-
-        // Ajuste de Janela
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
         animate();
     </script>
 </body>
