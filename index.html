@@ -1,57 +1,147 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Floresta 3D - Primeira Pessoa</title>
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
-  </head>
-  <body>
-    <a-scene>
-      <a-sky color="#87CEEB"></a-sky>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Jogo 3D - Primeira Pessoa</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        canvas { display: block; }
 
-      <a-plane position="0 0 0" rotation="-90 0 0" width="100" height="100" color="#228B22"></a-plane>
-
-      <a-light type="ambient" color="#BBB"></a-light>
-      <a-light type="directional" color="#FFF" intensity="0.6" position="-0.5 1 1"></a-light>
-
-      <a-entity id="rig" movement-controls="speed: 0.2">
-        <a-entity camera position="0 1.6 10" look-controls>
-          <a-cursor></a-cursor>
-        </a-entity>
-      </a-entity>
-
-      <a-entity position="0 0 0">
-        <a-box position="0 1.5 -5" width="6" height="3" depth="6" color="#8B4513" material="side: double">
-            <a-box position="0 -0.75 3" width="1.2" height="2" depth="0.1" color="#4A2511"></a-box>
-        </a-box>
+        /* Estilo dos Botões de Movimento */
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: grid;
+            grid-template-columns: repeat(3, 50px);
+            grid-gap: 10px;
+            z-index: 10;
+        }
+        .btn {
+            width: 50px;
+            height: 500px; /* Ajustado para visualização */
+            width: 60px; height: 60px;
+            background: rgba(255, 255, 255, 0.3);
+            border: 2px solid white;
+            border-radius: 10px;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn:active { background: rgba(255, 255, 255, 0.6); }
+        #up { grid-column: 2; }
+        #left { grid-column: 1; }
+        #down { grid-column: 2; }
+        #right { grid-column: 3; }
         
-        <a-box position="0 4.5 -5" width="6" height="3" depth="6" color="#A0522D" material="side: double"></a-box>
-        
-        <a-cone position="0 7 -5" radius-bottom="5" height="2" color="#333"></a-cone>
+        #instructions {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
 
-        <a-plane position="0 3.01 -5" rotation="-90 0 0" width="6" height="6" color="#5D2906"></a-plane>
-      </a-entity>
+    <div id="instructions">Use as setas, WASD ou os botões na tela</div>
+    
+    <div id="controls">
+        <div id="up" class="btn">W</div>
+        <div id="left" class="btn">A</div>
+        <div id="down" class="btn">S</div>
+        <div id="right" class="btn">D</div>
+    </div>
 
-      <a-entity position="-10 0 -10">
-        <a-cylinder color="#4b2d0b" height="3" radius="0.3"></a-cylinder>
-        <a-cone position="0 2.5 0" color="#0b5d1e" radius-bottom="1.5" height="3"></a-cone>
-      </a-entity>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
 
-      <a-entity position="8 0 -12">
-        <a-cylinder color="#4b2d0b" height="3" radius="0.3"></a-cylinder>
-        <a-cone position="0 2.5 0" color="#0b5d1e" radius-bottom="2" height="4"></a-cone>
-      </a-entity>
+    <script type="module">
+        import * as THREE from 'three';
 
-      <a-entity position="-5 0 5">
-        <a-cylinder color="#4b2d0b" height="3" radius="0.3"></a-cylinder>
-        <a-cone position="0 2.5 0" color="#0b5d1e" radius-bottom="1.5" height="3"></a-cone>
-      </a-entity>
+        // --- Configuração Básica ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Céu azul
 
-      <a-entity position="12 0 2">
-        <a-cylinder color="#4b2d0b" height="3" radius="0.3"></a-cylinder>
-        <a-cone position="0 2.5 0" color="#0b5d1e" radius-bottom="1.8" height="3.5"></a-cone>
-      </a-entity>
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-    </a-scene>
-  </body>
+        // --- Luz ---
+        const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
+        scene.add(light);
+
+        // --- Chão (Grid) ---
+        const planeSize = 100;
+        const loader = new THREE.TextureLoader();
+        const floorGeom = new THREE.PlaneGeometry(planeSize, planeSize);
+        const floorMat = new THREE.MeshPhongMaterial({ color: 0x228B22, side: THREE.DoubleSide });
+        const floor = new THREE.Mesh(floorGeom, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        const grid = new THREE.GridHelper(planeSize, 20, 0x000000, 0x555555);
+        scene.add(grid);
+
+        // --- Jogador (Câmera) ---
+        camera.position.y = 1.6; // Altura dos olhos
+
+        // --- Lógica de Movimento ---
+        const moveSpeed = 0.1;
+        const keys = { w: false, a: false, s: false, d: false };
+
+        // Listeners de Teclado
+        window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+        window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
+        // Listeners dos Botões na Tela
+        const setupBtn = (id, key) => {
+            const btn = document.getElementById(id);
+            btn.addEventListener('mousedown', () => keys[key] = true);
+            btn.addEventListener('mouseup', () => keys[key] = false);
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
+            btn.addEventListener('touchend', () => keys[key] = false);
+        };
+
+        setupBtn('up', 'w');
+        setupBtn('left', 'a');
+        setupBtn('down', 's');
+        setupBtn('right', 'd');
+
+        // --- Loop de Animação ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Movimentação simples (Z e X)
+            if (keys.w) camera.position.z -= moveSpeed;
+            if (keys.s) camera.position.z += moveSpeed;
+            if (keys.a) camera.position.x -= moveSpeed;
+            if (keys.d) camera.position.x += moveSpeed;
+
+            renderer.render(scene, camera);
+        }
+
+        // Ajuste de Janela
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
 </html>
