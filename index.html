@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meu Jogo 3D - Primeira Pessoa</title>
+    <title>Meu Jogo 3D - Floresta</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; }
         canvas { display: block; }
@@ -14,13 +14,11 @@
             bottom: 20px;
             left: 20px;
             display: grid;
-            grid-template-columns: repeat(3, 50px);
+            grid-template-columns: repeat(3, 60px);
             grid-gap: 10px;
             z-index: 10;
         }
         .btn {
-            width: 50px;
-            height: 500px; /* Ajustado para visualização */
             width: 60px; height: 60px;
             background: rgba(255, 255, 255, 0.3);
             border: 2px solid white;
@@ -32,6 +30,7 @@
             user-select: none;
             cursor: pointer;
             font-weight: bold;
+            font-size: 1.2em;
         }
         .btn:active { background: rgba(255, 255, 255, 0.6); }
         #up { grid-column: 2; }
@@ -45,13 +44,44 @@
             width: 100%;
             text-align: center;
             color: white;
-            pointer-events: none;
+            z-index: 100;
+        }
+
+        #blocker {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        #instructions-text {
+            color: white;
+            font-size: 2em;
+            text-align: center;
+        }
+        #start-button {
+            padding: 20px 40px;
+            font-size: 1.5em;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 10px;
         }
     </style>
 </head>
 <body>
 
-    <div id="instructions">Use as setas, WASD ou os botões na tela</div>
+    <div id="blocker">
+        <div id="instructions-text">
+            <p>Clique ou toque para jogar</p>
+            <p>(Use WASD ou Setas para mover, mouse/arrastar para olhar)</p>
+            <button id="start-button">Iniciar</button>
+        </div>
+    </div>
     
     <div id="controls">
         <div id="up" class="btn">W</div>
@@ -63,13 +93,15 @@
     <script type="importmap">
         {
             "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
             }
         }
     </script>
 
     <script type="module">
         import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
         // --- Configuração Básica ---
         const scene = new THREE.Scene();
@@ -81,55 +113,282 @@
         document.body.appendChild(renderer.domElement);
 
         // --- Luz ---
-        const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
-        scene.add(light);
+        const ambientLight = new THREE.AmbientLight(0xcccccc, 0.6); // Luz ambiente
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8); // Luz direcional (sol)
+        directionalLight.position.set(50, 200, 100);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
 
-        // --- Chão (Grid) ---
-        const planeSize = 100;
-        const loader = new THREE.TextureLoader();
-        const floorGeom = new THREE.PlaneGeometry(planeSize, planeSize);
-        const floorMat = new THREE.MeshPhongMaterial({ color: 0x228B22, side: THREE.DoubleSide });
-        const floor = new THREE.Mesh(floorGeom, floorMat);
-        floor.rotation.x = -Math.PI / 2;
-        scene.add(floor);
+        renderer.shadowMap.enabled = true; // Habilita sombras
+        directionalLight.shadow.mapSize.width = 1024;
+        directionalLight.shadow.mapSize.height = 1024;
+        directionalLight.shadow.camera.near = 0.5;
+        directionalLight.shadow.camera.far = 500;
+        directionalLight.shadow.camera.left = -100;
+        directionalLight.shadow.camera.right = 100;
+        directionalLight.shadow.camera.top = 100;
+        directionalLight.shadow.camera.bottom = -100;
 
-        const grid = new THREE.GridHelper(planeSize, 20, 0x000000, 0x555555);
-        scene.add(grid);
 
-        // --- Jogador (Câmera) ---
-        camera.position.y = 1.6; // Altura dos olhos
+        // --- Terreno com Relevo (HeightMap) ---
+        const terrainSize = 256; // Tamanho do terreno (nxn) - Aumentado para mais espaço
+        const terrainScale = 1; // Escala visual do terreno
+        const maxHeight = 20; // Altura máxima do relevo
+        const textureLoader = new THREE.TextureLoader();
+
+        // Função para gerar um HeightMap mais interessante (ruído Perlin simulado)
+        function generateHeightMap(width, height) {
+            const data = new Float32Array(width * height);
+            for (let x = 0; x < width; x++) {
+                for (let y = 0; y < height; y++) {
+                    const i = x + y * width;
+                    // Combinação de ruídos para terreno mais natural
+                    let val = 0;
+                    val += Math.sin(x * 0.05) * 0.5 + Math.cos(y * 0.03) * 0.4;
+                    val += Math.sin(x * 0.1) * 0.2 + Math.cos(y * 0.07) * 0.1;
+                    val += Math.random() * 0.1; // Pequeno ruído aleatório
+                    data[i] = Math.max(0, val) * 0.5 + 0.5; // Normaliza e garante positivos
+                }
+            }
+            return data;
+        }
+
+        const heightMap = generateHeightMap(terrainSize, terrainSize);
+
+        const terrainGeometry = new THREE.PlaneGeometry(terrainSize * terrainScale, terrainSize * terrainScale, terrainSize - 1, terrainSize - 1);
+        terrainGeometry.rotateX(-Math.PI / 2); // Deita o plano
+
+        const vertices = terrainGeometry.attributes.position.array;
+        for (let i = 0, j = 0; i < vertices.length; i += 3, j++) {
+            vertices[i + 1] = heightMap[j] * maxHeight;
+        }
+        terrainGeometry.computeVertexNormals();
+
+        const terrainMaterial = new THREE.MeshPhongMaterial({
+            color: 0x4F7942, // Verde floresta
+        });
+        textureLoader.load('https://cdn.rawgit.com/mrdoob/three.js/r129/examples/textures/grasslight-big.jpg', (texture) => {
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(terrainSize / 10, terrainSize / 10);
+            terrainMaterial.map = texture;
+            terrainMaterial.needsUpdate = true;
+        });
+
+        const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
+        terrain.receiveShadow = true; // Terreno recebe sombras
+        scene.add(terrain);
+
+        // Função para obter a altura do terreno em uma dada posição (x, z)
+        function getTerrainHeight(x, z) {
+            const worldX = x + (terrainSize * terrainScale) / 2;
+            const worldZ = z + (terrainSize * terrainScale) / 2;
+
+            const gridX = Math.floor(worldX / terrainScale);
+            const gridZ = Math.floor(worldZ / terrainScale);
+
+            if (gridX < 0 || gridX >= terrainSize - 1 || gridZ < 0 || gridZ >= terrainSize - 1) {
+                return 0; // Fora dos limites, ou retorne uma altura padrão
+            }
+
+            const index = gridX + gridZ * terrainSize;
+            return heightMap[index] * maxHeight;
+        }
+
+
+        // --- Gerar Floresta e Mato ---
+        const numTrees = 500; // Quantidade de árvores
+        const numBushes = 1000; // Quantidade de matos
+
+        // Texturas para árvores e matos
+        const treeTrunkTexture = textureLoader.load('https://cdn.rawgit.com/mrdoob/three.js/r129/examples/textures/wood.jpg');
+        treeTrunkTexture.wrapS = treeTrunkTexture.wrapT = THREE.RepeatWrapping;
+        treeTrunkTexture.repeat.set(1, 2);
+
+        const treeLeafTexture = textureLoader.load('https://cdn.rawgit.com/mrdoob/three.js/r129/examples/textures/tree.png');
+        treeLeafTexture.colorSpace = THREE.SRGBColorSpace;
+        
+        const bushTexture = textureLoader.load('https://cdn.rawgit.com/mrdoob/three.js/r129/examples/textures/grasslight-big.jpg');
+        bushTexture.colorSpace = THREE.SRGBColorSpace;
+
+
+        for (let i = 0; i < numTrees; i++) {
+            const trunkHeight = Math.random() * 3 + 2; // Altura do tronco entre 2 e 5
+            const trunkRadius = Math.random() * 0.2 + 0.1; // Raio do tronco entre 0.1 e 0.3
+            
+            const treeTrunkGeo = new THREE.CylinderGeometry(trunkRadius, trunkRadius, trunkHeight, 8);
+            const treeTrunkMat = new THREE.MeshPhongMaterial({ map: treeTrunkTexture, color: 0x8B4513 });
+            const trunk = new THREE.Mesh(treeTrunkGeo, treeTrunkMat);
+            trunk.castShadow = true;
+            trunk.receiveShadow = true;
+
+            const coneHeight = Math.random() * 4 + 3; // Altura da copa entre 3 e 7
+            const coneRadius = Math.random() * 2 + 1; // Raio da copa entre 1 e 3
+            const treeLeafGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 16);
+            const treeLeafMat = new THREE.MeshPhongMaterial({ map: treeLeafTexture, color: 0x228B22 });
+            const leaves = new THREE.Mesh(treeLeafGeo, treeLeafMat);
+            leaves.castShadow = true;
+            leaves.receiveShadow = true;
+
+
+            const tree = new THREE.Group();
+            tree.add(trunk);
+            tree.add(leaves);
+
+            // Posição aleatória
+            const x = (Math.random() - 0.5) * terrainSize * terrainScale * 0.9;
+            const z = (Math.random() - 0.5) * terrainSize * terrainScale * 0.9;
+            const y = getTerrainHeight(x, z);
+
+            trunk.position.y = trunkHeight / 2;
+            leaves.position.y = trunkHeight + coneHeight / 2 - 0.5; // Ajuste para sobrepor um pouco
+
+            tree.position.set(x, y, z);
+            scene.add(tree);
+        }
+
+        for (let i = 0; i < numBushes; i++) {
+            const bushSize = Math.random() * 0.8 + 0.4; // Tamanho do mato entre 0.4 e 1.2
+            const bushGeo = new THREE.BoxGeometry(bushSize, bushSize * 0.7, bushSize);
+            const bushMat = new THREE.MeshPhongMaterial({ map: bushTexture, color: 0x32CD32 });
+            const bush = new THREE.Mesh(bushGeo, bushMat);
+            bush.castShadow = true;
+            bush.receiveShadow = true;
+
+            const x = (Math.random() - 0.5) * terrainSize * terrainScale * 0.9;
+            const z = (Math.random() - 0.5) * terrainSize * terrainScale * 0.9;
+            const y = getTerrainHeight(x, z);
+
+            bush.position.set(x, y + bushSize * 0.35, z); // Ajusta para ficar no chão
+            scene.add(bush);
+        }
+
+        // --- Controles de Primeira Pessoa (PointerLockControls) ---
+        const controls = new PointerLockControls(camera, document.body);
+
+        const blocker = document.getElementById('blocker');
+        const startButton = document.getElementById('start-button');
+
+        startButton.addEventListener('click', () => {
+            controls.lock();
+        });
+
+        controls.addEventListener('lock', () => {
+            blocker.style.display = 'none';
+        });
+
+        controls.addEventListener('unlock', () => {
+            blocker.style.display = 'flex';
+        });
 
         // --- Lógica de Movimento ---
         const moveSpeed = 0.1;
-        const keys = { w: false, a: false, s: false, d: false };
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+        let isGrounded = false; // Indica se o jogador está no chão
 
-        // Listeners de Teclado
-        window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
-        window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+        const keys = { w: false, a: false, s: false, d: false, space: false }; // Adicionado espaço para pular
+
+        window.addEventListener('keydown', (event) => {
+            if (controls.isLocked) {
+                switch (event.key.toLowerCase()) {
+                    case 'w': keys.w = true; break;
+                    case 'a': keys.a = true; break;
+                    case 's': keys.s = true; break;
+                    case 'd': keys.d = true; break;
+                    case ' ': keys.space = true; break; // Pular
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (event) => {
+            if (controls.isLocked) {
+                switch (event.key.toLowerCase()) {
+                    case 'w': keys.w = false; break;
+                    case 'a': keys.a = false; break;
+                    case 's': keys.s = false; break;
+                    case 'd': keys.d = false; break;
+                    case ' ': keys.space = false; break;
+                }
+            }
+        });
 
         // Listeners dos Botões na Tela
         const setupBtn = (id, key) => {
             const btn = document.getElementById(id);
-            btn.addEventListener('mousedown', () => keys[key] = true);
-            btn.addEventListener('mouseup', () => keys[key] = false);
             btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
             btn.addEventListener('touchend', () => keys[key] = false);
+            btn.addEventListener('mousedown', () => keys[key] = true);
+            btn.addEventListener('mouseup', () => keys[key] = false);
         };
 
         setupBtn('up', 'w');
         setupBtn('left', 'a');
         setupBtn('down', 's');
         setupBtn('right', 'd');
+        // Você pode adicionar um botão de pulo se quiser:
+        // const jumpButton = document.createElement('div');
+        // jumpButton.id = 'jump';
+        // jumpButton.className = 'btn';
+        // jumpButton.textContent = 'Pulo';
+        // document.getElementById('controls').appendChild(jumpButton);
+        // setupBtn('jump', 'space');
+
+
+        // Posição inicial da câmera
+        camera.position.set(0, maxHeight + 5, 0);
 
         // --- Loop de Animação ---
         function animate() {
             requestAnimationFrame(animate);
 
-            // Movimentação simples (Z e X)
-            if (keys.w) camera.position.z -= moveSpeed;
-            if (keys.s) camera.position.z += moveSpeed;
-            if (keys.a) camera.position.x -= moveSpeed;
-            if (keys.d) camera.position.x += moveSpeed;
+            const prevCameraY = camera.position.y;
+
+            if (controls.isLocked) {
+                const delta = 0.016;
+
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+                velocity.y -= 9.8 * 10.0 * delta; // Gravidade
+
+                direction.z = Number(keys.w) - Number(keys.s);
+                direction.x = Number(keys.d) - Number(keys.a);
+                direction.normalize();
+
+                if (keys.w || keys.s) velocity.z -= direction.z * moveSpeed * 100.0 * delta;
+                if (keys.a || keys.d) velocity.x -= direction.x * moveSpeed * 100.0 * delta;
+
+                if (isGrounded && keys.space) {
+                    velocity.y = 10; // Força do pulo
+                    isGrounded = false;
+                }
+
+                controls.moveRight(-velocity.x * delta);
+                controls.moveForward(-velocity.z * delta);
+
+                camera.position.y += velocity.y * delta;
+
+                // Colisão com o terreno - RAYCASTING para seguir o relevo
+                const playerHeight = 1.8; // Altura do jogador
+                const raycaster = new THREE.Raycaster();
+                const down = new THREE.Vector3(0, -1, 0);
+                raycaster.set(camera.position, down);
+                const intersects = raycaster.intersectObject(terrain);
+
+                if (intersects.length > 0) {
+                    const groundHeight = intersects[0].point.y;
+                    if (camera.position.y < groundHeight + playerHeight) {
+                        camera.position.y = groundHeight + playerHeight;
+                        velocity.y = 0;
+                        isGrounded = true;
+                    }
+                } else {
+                    // Se o raycaster não acertar o terreno, significa que o jogador está fora dos limites
+                    // Ou o terreno não foi encontrado abaixo. Tratar como caindo no vazio.
+                    isGrounded = false;
+                }
+
+            }
 
             renderer.render(scene, camera);
         }
